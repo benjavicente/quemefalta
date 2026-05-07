@@ -1,5 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { useAuth } from '@/composables/useAuth'
+import { createRouter, createWebHistory } from 'vue-router';
+import { useAuth } from '@/composables/useAuth';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -32,43 +32,43 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresOnboarded: true },
     },
   ],
-})
+});
 
 // Guard global para proteger rutas
 router.beforeEach(async (to) => {
-  const { user, profile, loading, init } = useAuth()
+  const { user, profile, loading, init } = useAuth();
 
   // Asegurar que useAuth esté inicializado
-  await init()
+  await init();
 
   // Esperar a que termine de cargar la sesión
   if (loading.value) {
     // Pequeño retry mecanism (la sesión puede tardar unos ms en hidratarse)
-    await new Promise((r) => setTimeout(r, 100))
+    await new Promise((r) => setTimeout(r, 100));
   }
 
-  const isAuth = !!user.value
-  const isOnboarded = !!profile.value?.onboarded
+  const isAuth = !!user.value;
+  const isOnboarded = !!profile.value?.onboarded;
 
   // Ruta requiere auth pero no hay sesión → mandar a login
   if (to.meta.requiresAuth && !isAuth) {
-    return { name: 'auth' }
+    return { name: 'auth' };
   }
 
   // Ruta requiere onboarding pero no está onboarded → mandar a onboarding
   if (to.meta.requiresOnboarded && isAuth && !isOnboarded) {
-    return { name: 'onboarding' }
+    return { name: 'onboarding' };
   }
 
   // Si está autenticado y onboarded, no debería ir a /auth ni /onboarding
   if (to.meta.requiresGuest && isAuth) {
-    return { name: 'album' }
+    return { name: 'album' };
   }
 
   // Si está en onboarding pero ya está onboarded → mandar al álbum
   if (to.name === 'onboarding' && isOnboarded) {
-    return { name: 'album' }
+    return { name: 'album' };
   }
-})
+});
 
-export default router
+export default router;

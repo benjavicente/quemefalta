@@ -1,48 +1,48 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuth } from '@/composables/useAuth'
-import { supabase } from '@/lib/supabase'
+import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuth } from '@/composables/useAuth';
 
-const router = useRouter()
-const { user, profile, updateProfile } = useAuth()
+const router = useRouter();
+const { profile, updateProfile } = useAuth();
 
-const username = ref('')
-const error = ref('')
-const saving = ref(false)
+const username = ref('');
+const error = ref('');
+const saving = ref(false);
 
 const firstName = computed(() => {
-  return profile.value?.display_name?.split(' ')[0] ?? 'colega'
-})
+  return profile.value?.display_name?.split(' ')[0] ?? 'colega';
+});
 
 const previewUsername = computed(() => {
-  return username.value || 'tu_username'
-})
+  return username.value || 'tu_username';
+});
 
 async function submit() {
-  error.value = ''
+  error.value = '';
 
-  const cleaned = username.value.toLowerCase().trim()
+  const cleaned = username.value.toLowerCase().trim();
 
   if (!/^[a-z0-9_]{3,20}$/.test(cleaned)) {
-    error.value = '3-20 caracteres, solo letras minúsculas, números y _'
-    return
+    error.value = '3-20 caracteres, solo letras minúsculas, números y _';
+    return;
   }
 
-  saving.value = true
+  saving.value = true;
 
   // Verificar si está disponible (puede tirar 23505 si ya existe)
   try {
-    await updateProfile({ username: cleaned, onboarded: true })
-    router.replace('/album')
-  } catch (e: any) {
-    if (e.code === '23505') {
-      error.value = 'Ese username ya está tomado. Probá otro.'
+    await updateProfile({ username: cleaned, onboarded: true });
+    router.replace('/album');
+  } catch (e: unknown) {
+    const err = e as { code?: string; message?: string };
+    if (err.code === '23505') {
+      error.value = 'Ese username ya está tomado. Probá otro.';
     } else {
-      error.value = e.message || 'Error al guardar'
+      error.value = err.message || 'Error al guardar';
     }
   } finally {
-    saving.value = false
+    saving.value = false;
   }
 }
 </script>
@@ -55,9 +55,7 @@ async function submit() {
       </div>
       <div class="greet">¡HOLA, {{ firstName.toUpperCase() }}!</div>
       <h2 class="title">Elige tu username</h2>
-      <p class="desc">
-        Es tu identidad pública. Será parte de la URL de tu perfil:
-      </p>
+      <p class="desc">Es tu identidad pública. Será parte de la URL de tu perfil:</p>
       <div class="url-preview">
         quemefalta.app/u/<span>{{ previewUsername }}</span>
       </div>
