@@ -41,7 +41,7 @@ describe('GroupPicker', () => {
     it('renders intro button', () => {
       const w = mountPicker();
       expect(w.find('.gp-intro').exists()).toBe(true);
-      expect(w.find('.gp-intro-name').text()).toBe('Introducción');
+      expect(w.find('.gp-intro-name').text()).toContain('Introducción');
     });
 
     it('renders 12 group headers (A-L)', () => {
@@ -97,7 +97,7 @@ describe('GroupPicker', () => {
       await w.findAll('.gp-head')[1].trigger('click'); // Expand B
       expect(w.findAll('.gp-teams')).toHaveLength(1);
       // Should now show Group B teams
-      expect(w.findAll('.gp-team')[0].find('.gp-team-name').text()).toBe('Estados Unidos');
+      expect(w.findAll('.gp-team')[0].find('.gp-team-name').text()).toContain('Estados Unidos');
     });
   });
 

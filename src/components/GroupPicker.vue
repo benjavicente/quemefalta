@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { ALBUM_SECTIONS } from '@/lib/albumData';
+import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import { useStickers } from '@/composables/useStickers';
 
 const props = defineProps<{
@@ -70,7 +71,10 @@ const activeGroup = computed(() => {
   <div class="gp">
     <!-- Intro chip -->
     <button :class="['gp-intro', { on: activeSection === 'intro' }]" @click="selectTeam('intro')">
-      <span class="gp-intro-name">Introducción</span>
+      <span class="gp-intro-name">
+        <span class="gp-intro-flag" aria-hidden="true">{{ teamFlagEmoji('FWC') }}</span>
+        <span>Introducción</span>
+      </span>
       <span class="gp-intro-count">{{ introSection.owned }}/{{ introSection.count }}</span>
     </button>
 
@@ -112,7 +116,10 @@ const activeGroup = computed(() => {
             :class="['gp-team', { on: activeSection === team.id, done: team.complete }]"
             @click="selectTeam(team.id)"
           >
-            <span class="gp-team-name">{{ team.name }}</span>
+            <span class="gp-team-name">
+              <span class="gp-team-flag" aria-hidden="true">{{ teamFlagEmoji(team.code) }}</span>
+              {{ team.name }}
+            </span>
             <span class="gp-team-count" :class="{ 'gp-team-done': team.complete }">
               {{ team.owned }}/{{ team.count }}
             </span>
@@ -157,6 +164,16 @@ const activeGroup = computed(() => {
 }
 .gp-intro.on .gp-intro-count {
   opacity: 1;
+}
+.gp-intro-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.gp-intro-flag {
+  flex-shrink: 0;
+  font-size: 1.15em;
+  line-height: 1;
 }
 
 .gp-grid {
@@ -311,9 +328,18 @@ const activeGroup = computed(() => {
   color: var(--mint);
 }
 .gp-team-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.gp-team-flag {
+  flex-shrink: 0;
+  font-size: 1.1em;
+  line-height: 1;
 }
 .gp-team-count {
   font-family: var(--mono);

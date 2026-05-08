@@ -60,7 +60,7 @@ describe('SectionView', () => {
   describe('rendering', () => {
     it('renders section name', () => {
       const w = mountSection();
-      expect(w.find('.sect-name').text()).toBe('México');
+      expect(w.find('.sect-name').text()).toContain('México');
     });
 
     it('renders sticker range', () => {

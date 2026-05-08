@@ -6,6 +6,7 @@ import { useStickers } from '@/composables/useStickers';
 import { useUndo } from '@/composables/useUndo';
 import type { StickerState } from '@/composables/useStickers';
 import type { AlbumSection } from '@/lib/albumData';
+import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 
 const props = defineProps<{
   section: AlbumSection;
@@ -20,6 +21,8 @@ const { stickers, getSticker, cycleSticker, markSectionComplete, clearSection, s
 const { pushUndo } = useUndo();
 
 const showClearConfirm = ref(false);
+
+const sectionHeadIcon = computed(() => teamFlagEmoji(props.section.code));
 
 const items = computed(() => {
   return Array.from({ length: props.section.count }, (_, i) => {
@@ -157,7 +160,10 @@ onUnmounted(() => cleanupPaint());
   <section class="sect">
     <header class="sect-head">
       <div>
-        <div class="sect-name">{{ section.name }}</div>
+        <div class="sect-name">
+          <span v-if="sectionHeadIcon" class="sect-flag" aria-hidden="true">{{ sectionHeadIcon }}</span>
+          {{ section.name }}
+        </div>
         <div class="sect-meta">{{ section.code }}1—{{ section.code }}{{ section.count }}</div>
       </div>
       <div class="sect-badge">{{ ownedCount }}/{{ section.count }}</div>
@@ -248,6 +254,15 @@ onUnmounted(() => cleanupPaint());
   letter-spacing: 0.04em;
   line-height: 1;
   text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.sect-flag {
+  flex-shrink: 0;
+  font-size: 0.95em;
+  line-height: 1;
+  text-transform: none;
 }
 .sect-meta {
   font-family: var(--mono);

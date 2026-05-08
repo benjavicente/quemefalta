@@ -5,6 +5,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useStickers } from '@/composables/useStickers';
 import { useMeta } from '@/composables/useMeta';
 import { ALBUM_SECTIONS, TOTAL_STICKERS, sectionForSticker, codeForSticker } from '@/lib/albumData';
+import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import SectionView from '@/components/SectionView.vue';
 import StickerDetailModal from '@/components/StickerDetailModal.vue';
 import ShareModal from '@/components/ShareModal.vue';
@@ -630,12 +631,19 @@ const userInitial = computed(() => {
                 @click="toggleMissingCollapse(group.section.id)"
               >
                 <div class="list-group-head-left">
-                  <span>{{ group.section.name }}</span>
+                  <span
+                    v-if="teamFlagEmoji(group.section.code)"
+                    class="list-group-flag"
+                    aria-hidden="true"
+                    >{{ teamFlagEmoji(group.section.code) }}</span
+                  >
+                  <span class="list-group-title"
+                    >{{ group.section.name }} ({{ group.items.length }})</span
+                  >
                   <span v-if="group.pctOwned >= 80" class="almost-badge">¡Casi!</span>
                 </div>
                 <div class="list-group-head-right">
                   <span class="list-group-pct">{{ Math.round(group.pctOwned) }}%</span>
-                  <span class="list-group-count">{{ group.items.length }}</span>
                   <span class="list-group-chevron">{{
                     missingCollapsed.has(group.section.id) ? '▸' : '▾'
                   }}</span>
@@ -1375,6 +1383,16 @@ const userInitial = computed(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.list-group-flag {
+  flex-shrink: 0;
+  font-size: 1.15em;
+  line-height: 1;
+}
+.list-group-title {
+  min-width: 0;
 }
 .list-group-head-right {
   display: flex;
@@ -1395,15 +1413,6 @@ const userInitial = computed(() => {
   font-family: var(--mono);
   font-size: 10px;
   color: rgba(246, 241, 225, 0.4);
-}
-.list-group-count {
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--gold);
-  background: rgba(232, 179, 65, 0.1);
-  padding: 2px 8px;
-  border-radius: 100px;
 }
 .list-group-chevron {
   font-size: 10px;
