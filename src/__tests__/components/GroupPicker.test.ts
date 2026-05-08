@@ -50,11 +50,11 @@ describe('GroupPicker', () => {
       expect(heads).toHaveLength(12);
     });
 
-    it('shows group letter and percentage', () => {
+    it('shows group letter and owned count', () => {
       const w = mountPicker();
       const first = w.find('.gp-head');
       expect(first.find('.gp-letter').text()).toBe('A');
-      expect(first.find('.gp-pct').text()).toContain('%');
+      expect(first.find('.gp-owned-count').text()).toContain('/80');
     });
 
     it('highlights intro when activeSection is intro', () => {

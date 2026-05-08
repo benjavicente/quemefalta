@@ -10,7 +10,9 @@ import StickerDetailModal from '@/components/StickerDetailModal.vue';
 import ShareModal from '@/components/ShareModal.vue';
 import GroupPicker from '@/components/GroupPicker.vue';
 import BatchInput from '@/components/BatchInput.vue';
+import StickerScanner from '@/components/StickerScanner.vue';
 import UndoToast from '@/components/UndoToast.vue';
+import OnboardingGuide from '@/components/OnboardingGuide.vue';
 
 const { profile, signOut } = useAuth();
 const {
@@ -46,11 +48,25 @@ const reloadPage = () => location.reload();
 const detailFor = ref<number | null>(null);
 const shareOpen = ref(false);
 const showBatchInput = ref(false);
+const showScanner = ref(false);
 const showProfileMenu = ref(false);
 const sectionSearch = ref('');
 
 // Undo toast state
 const undoToast = ref({ visible: false, message: '', action: null as (() => void) | null });
+
+// Onboarding guide
+const showOnboarding = ref(false);
+
+// Auto-collapse completed sections: tracks which sections are manually expanded by the user
+const manuallyExpanded = ref<Set<string>>(new Set());
+
+function toggleCompletedSection(sectionId: string) {
+  const s = new Set(manuallyExpanded.value);
+  if (s.has(sectionId)) s.delete(sectionId);
+  else s.add(sectionId);
+  manuallyExpanded.value = s;
+}
 
 // Long-press onboarding
 const showLongPressTip = ref(false);
@@ -59,6 +75,17 @@ const hasSeenLongPressTip = ref(false);
 onMounted(() => {
   hasSeenLongPressTip.value = localStorage.getItem('qmf-longpress-tip') === '1';
 });
+
+// Show onboarding when loaded, authenticated, and truly new user (0 stickers)
+watch(
+  [loaded, () => stats.value.owned],
+  ([isLoaded, ownedCount]) => {
+    if (isLoaded && ownedCount === 0 && !localStorage.getItem('quemefalta_onboarding_done')) {
+      showOnboarding.value = true;
+    }
+  },
+  { immediate: true },
+);
 
 function onFirstSticker() {
   if (!hasSeenLongPressTip.value) {
@@ -288,6 +315,22 @@ async function handleBatchAdd(numbers: number[]) {
   }
 }
 
+// Scanner handler — reuses the same toast logic
+async function handleScannerAdd(numbers: number[]) {
+  showScanner.value = false;
+  const count = await addBatch(numbers);
+  if (count && count > 0) {
+    undoToast.value = {
+      visible: true,
+      message: `${count} láminas escaneadas y agregadas`,
+      action: null,
+    };
+    setTimeout(() => {
+      undoToast.value.visible = false;
+    }, 3000);
+  }
+}
+
 // Open detail for a dupe directly (instead of jumping to section)
 function openDupeDetail(num: number) {
   detailFor.value = num;
@@ -328,6 +371,20 @@ const userInitial = computed(() => {
             <circle cx="18" cy="19" r="3" />
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+        </button>
+        <button class="hdr-icon-btn" title="Tutorial de uso" @click="showOnboarding = true">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
         </button>
         <!-- Profile button with dropdown -->
@@ -414,6 +471,23 @@ const userInitial = computed(() => {
         <button :class="['tab', { on: view === 'dupes' }]" @click="view = 'dupes'">
           Repetidas {{ stats.dupes }}
         </button>
+        <!-- Scan button -->
+        <button class="tab-scan" title="Escanear sobre" @click="showScanner = true">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+            <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+            <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+            <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+            <line x1="7" y1="12" x2="17" y2="12" />
+          </svg>
+        </button>
         <!-- Batch input button -->
         <button class="tab-add" title="Agregar láminas por número" @click="showBatchInput = true">
           + Agregar
@@ -476,7 +550,39 @@ const userInitial = computed(() => {
             </div>
           </button>
         </div>
-        <SectionView :section="currentSection" @open-detail="handleSectionOpenDetail" />
+        <!-- Auto-collapse completed section or show full grid -->
+        <div
+          v-if="
+            sectionsWithCounts.find((s) => s.id === currentSection.id)?.complete &&
+            !manuallyExpanded.has(currentSection.id)
+          "
+          class="collapsed-section"
+          @click="toggleCompletedSection(currentSection.id)"
+        >
+          <div class="collapsed-left">
+            <span class="collapsed-name">{{ currentSection.name }}</span>
+          </div>
+          <div class="collapsed-right">
+            <span class="collapsed-badge">Completa</span>
+            <span class="collapsed-count"
+              >{{ currentSection.count }}/{{ currentSection.count }}</span
+            >
+            <span class="collapsed-chevron">&#9656;</span>
+          </div>
+        </div>
+        <template v-else>
+          <SectionView :section="currentSection" @open-detail="handleSectionOpenDetail" />
+          <button
+            v-if="
+              sectionsWithCounts.find((s) => s.id === currentSection.id)?.complete &&
+              manuallyExpanded.has(currentSection.id)
+            "
+            class="collapse-back-btn"
+            @click="toggleCompletedSection(currentSection.id)"
+          >
+            Colapsar seccion
+          </button>
+        </template>
       </template>
 
       <!-- MISSING VIEW with filters -->
@@ -615,6 +721,9 @@ const userInitial = computed(() => {
     <!-- BATCH INPUT MODAL -->
     <BatchInput v-if="showBatchInput" @add="handleBatchAdd" @close="showBatchInput = false" />
 
+    <!-- STICKER SCANNER MODAL -->
+    <StickerScanner v-if="showScanner" @add="handleScannerAdd" @close="showScanner = false" />
+
     <!-- LONG-PRESS TIP -->
     <Transition name="tip">
       <div v-if="showLongPressTip" class="longpress-tip">
@@ -640,6 +749,9 @@ const userInitial = computed(() => {
       :pct="stats.pct"
       @close="shareOpen = false"
     />
+
+    <!-- ONBOARDING GUIDE -->
+    <OnboardingGuide v-if="showOnboarding" @done="showOnboarding = false" />
   </div>
 </template>
 
@@ -988,8 +1100,26 @@ const userInitial = computed(() => {
   color: var(--gold);
   border-bottom-color: var(--gold);
 }
-.tab-add {
+.tab-scan {
   margin-left: auto;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold);
+  background: rgba(232, 179, 65, 0.08);
+  border: 1px solid rgba(232, 179, 65, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.tab-scan:hover {
+  background: rgba(232, 179, 65, 0.15);
+}
+.tab-add {
+  margin-left: 0;
   padding: 7px 14px;
   font-size: 11px;
   font-weight: 700;
@@ -1483,5 +1613,79 @@ const userInitial = computed(() => {
 .tip-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(20px);
+}
+.collapsed-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px clamp(14px, 3vw, 28px);
+  margin: 8px clamp(14px, 3vw, 28px) 0;
+  background: rgba(246, 241, 225, 0.03);
+  border: 1px solid rgba(95, 194, 138, 0.25);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  min-height: 48px;
+}
+.collapsed-section:hover {
+  background: rgba(246, 241, 225, 0.06);
+}
+.collapsed-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.collapsed-name {
+  font-family: var(--display);
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.collapsed-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.collapsed-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--mint);
+  background: rgba(95, 194, 138, 0.12);
+  padding: 3px 10px;
+  border-radius: 100px;
+}
+.collapsed-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--mint);
+  opacity: 0.7;
+}
+.collapsed-chevron {
+  font-size: 12px;
+  color: rgba(246, 241, 225, 0.4);
+}
+.collapse-back-btn {
+  display: block;
+  margin: 12px auto 0;
+  padding: 8px 18px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: rgba(246, 241, 225, 0.5);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.collapse-back-btn:hover {
+  color: var(--chalk);
+  border-color: var(--chalk);
 }
 </style>

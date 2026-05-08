@@ -86,7 +86,15 @@ const activeGroup = computed(() => {
         >
           <div class="gp-head-left">
             <span class="gp-letter">{{ gd.group }}</span>
-            <span class="gp-pct">{{ gd.pct }}%</span>
+            <span v-if="gd.complete" class="gp-complete-check">&#10003;</span>
+            <span
+              class="gp-owned-count"
+              :class="{
+                'gp-owned-gold': gd.owned > 0 && !gd.complete,
+                'gp-owned-mint': gd.complete,
+              }"
+              >{{ gd.owned }}/{{ gd.total }}</span
+            >
           </div>
           <div class="gp-head-bar">
             <div
@@ -95,7 +103,7 @@ const activeGroup = computed(() => {
               :style="{ width: `${gd.pct}%` }"
             />
           </div>
-          <span class="gp-chevron">{{ expanded === gd.group ? '▾' : '▸' }}</span>
+          <span class="gp-chevron">{{ expanded === gd.group ? '&#9662;' : '&#9656;' }}</span>
         </button>
         <div v-if="expanded === gd.group" class="gp-teams">
           <button
@@ -196,8 +204,8 @@ const activeGroup = computed(() => {
 }
 .gp-head-left {
   display: flex;
-  align-items: baseline;
-  gap: 5px;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
 }
 .gp-letter {
@@ -213,6 +221,26 @@ const activeGroup = computed(() => {
   font-family: var(--mono);
   font-size: 9px;
   opacity: 0.6;
+}
+.gp-complete-check {
+  font-size: 11px;
+  color: var(--mint);
+  font-weight: 700;
+  line-height: 1;
+}
+.gp-owned-count {
+  font-family: var(--mono);
+  font-size: 9px;
+  opacity: 0.5;
+  white-space: nowrap;
+}
+.gp-owned-gold {
+  color: var(--gold);
+  opacity: 0.8;
+}
+.gp-owned-mint {
+  color: var(--mint);
+  opacity: 0.9;
 }
 .gp-head-bar {
   flex: 1;

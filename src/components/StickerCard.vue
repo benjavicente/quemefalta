@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { StickerState } from '@/composables/useStickers';
 import ballImg from '@/assets/ball-stadium.png';
 
@@ -7,6 +7,7 @@ const props = defineProps<{
   number: number;
   code: string;
   state: StickerState;
+  animDelay?: number;
 }>();
 
 const emit = defineEmits<{
@@ -16,6 +17,38 @@ const emit = defineEmits<{
 
 const owned = computed(() => props.state.owned);
 const dupes = computed(() => props.state.dupes);
+
+// Micro-animation: pop when becoming owned
+const justMarked = ref(false);
+const badgeBounce = ref(false);
+let prevOwned = props.state.owned;
+let prevDupes = props.state.dupes;
+
+watch(
+  () => props.state,
+  (newState) => {
+    // Owned transition: not-owned -> owned
+    if (newState.owned && !prevOwned) {
+      const delay = props.animDelay ?? 0;
+      setTimeout(() => {
+        justMarked.value = true;
+        setTimeout(() => {
+          justMarked.value = false;
+        }, 350);
+      }, delay);
+    }
+    // Badge bounce: dupes changed
+    if (newState.owned && newState.dupes !== prevDupes && prevOwned) {
+      badgeBounce.value = true;
+      setTimeout(() => {
+        badgeBounce.value = false;
+      }, 300);
+    }
+    prevOwned = newState.owned;
+    prevDupes = newState.dupes;
+  },
+  { deep: true },
+);
 const hasNote = computed(() => !!props.state.note);
 
 // Long press detection + isPressed guard for paint-mode compatibility
@@ -57,7 +90,7 @@ function onPointerCancel() {
   <div class="stk-wrap">
     <div
       class="stk"
-      :class="{ 'stk-owned': owned, 'stk-dupe': dupes > 0 }"
+      :class="{ 'stk-owned': owned, 'stk-dupe': dupes > 0, 'stk-just-marked': justMarked }"
       @pointerdown.prevent="onPointerDown"
       @pointerup="onPointerUp"
       @pointercancel="onPointerCancel"
@@ -81,7 +114,9 @@ function onPointerCancel() {
         <span class="stk-num" :class="{ 'stk-num-owned': owned }">{{ code }}</span>
       </div>
       <!-- Badges -->
-      <div v-if="dupes > 0" class="stk-badge">×{{ dupes + 1 }}</div>
+      <div v-if="dupes > 0" class="stk-badge" :class="{ 'stk-badge-bounce': badgeBounce }">
+        ×{{ dupes + 1 }}
+      </div>
       <div v-if="hasNote" class="stk-note-dot" />
     </div>
   </div>
@@ -250,5 +285,43 @@ function onPointerCancel() {
   background: var(--pitch-deep);
   border-radius: 50%;
   z-index: 2;
+}
+
+/* Micro-animations */
+@keyframes stkPop {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(212, 160, 23, 0);
+  }
+  40% {
+    transform: scale(1.12);
+    box-shadow: 0 0 16px 4px rgba(212, 160, 23, 0.35);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 8px 24px rgba(232, 179, 65, 0.18);
+  }
+}
+.stk-just-marked {
+  animation: stkPop 0.25s ease-out;
+}
+.stk-just-marked:active {
+  /* Don't shrink during pop animation */
+  transform: none;
+}
+
+@keyframes badgeBounce {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.stk-badge-bounce {
+  animation: badgeBounce 0.2s ease-out;
 }
 </style>

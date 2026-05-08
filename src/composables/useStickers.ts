@@ -1,6 +1,7 @@
 import { ref, computed, readonly, watch } from 'vue';
 import { supabase, ensureFreshSession, withAuthRetry, sessionDead } from '@/lib/supabase';
 import { useAuth } from '@/composables/useAuth';
+import { useUndo } from '@/composables/useUndo';
 import { TOTAL_STICKERS } from '@/lib/albumData';
 
 export interface StickerState {
@@ -57,12 +58,12 @@ async function loadStickers(userId: string, force = false) {
 }
 
 // Upsert con optimistic update
-async function setSticker(stickerNumber: number, newState: StickerState) {
+async function setSticker(stickerNumber: number, newState: StickerState, _force = false) {
   const { user } = useAuth();
   if (!user.value) return;
 
-  // Si ya hay una operacion en vuelo para este sticker, ignorar
-  if (inFlight.has(stickerNumber)) return;
+  // Si ya hay una operacion en vuelo para este sticker, ignorar (salvo undo forzado)
+  if (!_force && inFlight.has(stickerNumber)) return;
   inFlight.add(stickerNumber);
 
   // Refrescar sesion si lleva rato sin actividad
@@ -138,13 +139,27 @@ async function setSticker(stickerNumber: number, newState: StickerState) {
 }
 
 // Tap: vacio → owned → ×2 → ×3 (se queda en ×3, para quitar usar modal)
-function cycleSticker(stickerNumber: number) {
+function cycleSticker(stickerNumber: number, _skipUndo = false) {
   if (inFlight.has(stickerNumber)) return;
   const current = stickers.value[stickerNumber] ?? defaultState();
+  const prevState = { ...current };
+
   if (!current.owned) {
     setSticker(stickerNumber, { ...current, owned: true, dupes: 0 });
+    if (!_skipUndo) {
+      const { pushUndo } = useUndo();
+      pushUndo('1 lamina marcada', () => {
+        setSticker(stickerNumber, prevState, true);
+      });
+    }
   } else if (current.dupes < 2) {
     setSticker(stickerNumber, { ...current, dupes: current.dupes + 1 });
+    if (!_skipUndo) {
+      const { pushUndo } = useUndo();
+      pushUndo('1 repetida agregada', () => {
+        setSticker(stickerNumber, prevState, true);
+      });
+    }
   }
   // ×3 se queda — no vuelve a vacío por tap accidental
 }
@@ -301,6 +316,42 @@ async function markSectionComplete(startsAt: number, count: number) {
     syncError.value = error.message;
   } else {
     syncError.value = null;
+    // Push undo for section complete
+    const { pushUndo } = useUndo();
+    const snapshot = toInsert.map(({ num, prev }) => ({
+      num,
+      prev: prev ? { ...prev } : undefined,
+    }));
+    pushUndo(`${toInsert.length} laminas marcadas`, () => {
+      const revertMap = { ...stickers.value };
+      for (const { num, prev } of snapshot) {
+        if (prev) {
+          revertMap[num] = prev;
+        } else {
+          delete revertMap[num];
+        }
+      }
+      stickers.value = revertMap;
+      // Also persist the revert to the server
+      const { user } = useAuth();
+      if (!user.value) return;
+      const toDelete = snapshot.filter((s) => !s.prev || !s.prev.owned);
+      const toRestore = snapshot.filter((s) => s.prev && s.prev.owned);
+      if (toDelete.length > 0) {
+        const nums = toDelete.map((s) => s.num);
+        supabase.from('stickers').delete().eq('user_id', user.value.id).in('sticker_number', nums);
+      }
+      if (toRestore.length > 0) {
+        const rows = toRestore.map((s) => ({
+          user_id: user.value!.id,
+          sticker_number: s.num,
+          owned: s.prev!.owned,
+          dupes: s.prev!.dupes,
+          note: s.prev!.note || null,
+        }));
+        supabase.from('stickers').upsert(rows, { onConflict: 'user_id,sticker_number' });
+      }
+    });
   }
   sectionInFlight = false;
 }
@@ -431,7 +482,8 @@ export function useStickers() {
     sessionDead,
     stats,
     getSticker: (n: number): StickerState => stickers.value[n] ?? defaultState(),
-    cycleSticker,
+    cycleSticker: cycleSticker as (n: number, skipUndo?: boolean) => void,
+    setSticker,
     adjustDupes,
     removeSticker,
     markSectionComplete,

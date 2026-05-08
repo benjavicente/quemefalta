@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { watch, onUnmounted } from 'vue';
+import { computed, watch, onUnmounted } from 'vue';
+import { useUndo } from '@/composables/useUndo';
 
 const props = defineProps<{
-  message: string;
-  visible: boolean;
+  /** Legacy: override message from parent */
+  message?: string;
+  /** Legacy: override visibility from parent */
+  visible?: boolean;
   duration?: number;
 }>();
 
@@ -12,36 +15,59 @@ const emit = defineEmits<{
   dismiss: [];
 }>();
 
-let timer: ReturnType<typeof setTimeout> | null = null;
+const { currentUndo, executeUndo, dismiss } = useUndo();
 
-function startTimer() {
-  clearTimer();
-  timer = setTimeout(() => emit('dismiss'), props.duration ?? 3000);
-}
+// Combine legacy props with undo composable
+const isVisible = computed(() => props.visible || !!currentUndo.value);
+const displayMessage = computed(() => {
+  if (props.visible && props.message) return props.message;
+  return currentUndo.value?.description ?? '';
+});
+const hasUndoAction = computed(() => !!currentUndo.value || false);
 
-function clearTimer() {
-  if (timer) {
-    clearTimeout(timer);
-    timer = null;
+let legacyTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearLegacyTimer() {
+  if (legacyTimer) {
+    clearTimeout(legacyTimer);
+    legacyTimer = null;
   }
 }
 
+// Legacy timer for parent-controlled toasts
 watch(
   () => props.visible,
   (v) => {
-    if (v) startTimer();
-    else clearTimer();
+    clearLegacyTimer();
+    if (v && !currentUndo.value) {
+      legacyTimer = setTimeout(() => emit('dismiss'), props.duration ?? 3000);
+    }
   },
 );
 
-onUnmounted(clearTimer);
+function handleUndo() {
+  if (currentUndo.value) {
+    executeUndo();
+  } else {
+    emit('undo');
+  }
+}
+
+function handleDismiss() {
+  if (currentUndo.value) {
+    dismiss();
+  }
+  emit('dismiss');
+}
+
+onUnmounted(clearLegacyTimer);
 </script>
 
 <template>
   <Transition name="toast">
-    <div v-if="visible" class="toast">
-      <span class="toast-msg">{{ message }}</span>
-      <button class="toast-undo" @click="emit('undo')">DESHACER</button>
+    <div v-if="isVisible" class="toast" @click="handleDismiss">
+      <span class="toast-msg">{{ displayMessage }}</span>
+      <button v-if="hasUndoAction" class="toast-undo" @click.stop="handleUndo">DESHACER</button>
     </div>
   </Transition>
 </template>
@@ -63,6 +89,7 @@ onUnmounted(clearTimer);
   z-index: 200;
   max-width: 400px;
   width: calc(100% - 40px);
+  cursor: pointer;
 }
 .toast-msg {
   flex: 1;

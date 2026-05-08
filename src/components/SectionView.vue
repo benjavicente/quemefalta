@@ -3,6 +3,8 @@ import { computed, ref, onUnmounted } from 'vue';
 import StickerCard from '@/components/StickerCard.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { useStickers } from '@/composables/useStickers';
+import { useUndo } from '@/composables/useUndo';
+import type { StickerState } from '@/composables/useStickers';
 import type { AlbumSection } from '@/lib/albumData';
 
 const props = defineProps<{
@@ -13,7 +15,9 @@ const emit = defineEmits<{
   openDetail: [stickerNumber: number];
 }>();
 
-const { stickers, getSticker, cycleSticker, markSectionComplete, clearSection } = useStickers();
+const { stickers, getSticker, cycleSticker, markSectionComplete, clearSection, setSticker } =
+  useStickers();
+const { pushUndo } = useUndo();
 
 const showClearConfirm = ref(false);
 
@@ -56,6 +60,8 @@ function confirmClear() {
 // ── Paint mode (swipe-to-mark) ──
 const isPainting = ref(false);
 const paintedNums = new Set<number>();
+const paintPrevStates = new Map<number, StickerState>();
+const paintOrder = ref(new Map<number, number>()); // num -> order index for stagger
 let paintStart: number | null = null;
 let docMoveHandler: ((e: PointerEvent) => void) | null = null;
 let docUpHandler: (() => void) | null = null;
@@ -68,31 +74,41 @@ function stkFromPoint(x: number, y: number): number | null {
   return isNaN(n) ? null : n;
 }
 
+function paintMark(n: number) {
+  if (!paintedNums.has(n) && !getSticker(n).owned) {
+    paintPrevStates.set(n, { ...getSticker(n) });
+    const order = new Map(paintOrder.value);
+    order.set(n, paintedNums.size);
+    paintOrder.value = order;
+    paintedNums.add(n);
+    cycleSticker(n, true); // skip individual undo
+  }
+}
+
 function onPaintStart(num: number, e: PointerEvent) {
   if (e.button !== 0) return;
 
   paintStart = num;
   isPainting.value = false;
   paintedNums.clear();
+  paintPrevStates.clear();
 
   docMoveHandler = (ev: PointerEvent) => {
     const n = stkFromPoint(ev.clientX, ev.clientY);
     if (n === null) return;
 
-    // Moved to a different card → enter paint mode
+    // Moved to a different card -> enter paint mode
     if (!isPainting.value && n !== paintStart) {
       isPainting.value = true;
       // Mark the starting card
       if (paintStart !== null) {
-        paintedNums.add(paintStart);
-        if (!getSticker(paintStart).owned) cycleSticker(paintStart);
+        paintMark(paintStart);
       }
     }
 
     // Mark every new card the pointer touches
-    if (isPainting.value && !paintedNums.has(n)) {
-      paintedNums.add(n);
-      if (!getSticker(n).owned) cycleSticker(n);
+    if (isPainting.value) {
+      paintMark(n);
     }
   };
 
@@ -113,9 +129,25 @@ function cleanupPaint() {
     document.removeEventListener('pointercancel', docUpHandler);
     docUpHandler = null;
   }
+
+  // Push batch undo if we painted multiple stickers
+  if (paintPrevStates.size > 1) {
+    const snapshot = new Map(paintPrevStates);
+    pushUndo(`${snapshot.size} laminas marcadas`, () => {
+      for (const [num, prev] of snapshot) {
+        setSticker(num, prev, true);
+      }
+    });
+  }
+
   paintStart = null;
   isPainting.value = false;
   paintedNums.clear();
+  paintPrevStates.clear();
+  // Clear paint order after animations complete
+  setTimeout(() => {
+    paintOrder.value = new Map();
+  }, 500);
 }
 
 onUnmounted(() => cleanupPaint());
@@ -141,6 +173,7 @@ onUnmounted(() => cleanupPaint());
           :number="item.number"
           :code="item.code"
           :state="item.state"
+          :anim-delay="(paintOrder.get(item.number) ?? 0) * 40"
           @cycle="cycleSticker(item.number)"
           @open-detail="emit('openDetail', item.number)"
         />

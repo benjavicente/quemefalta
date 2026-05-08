@@ -6,7 +6,9 @@ import { useMeta } from '@/composables/useMeta';
 beforeEach(() => {
   document.title = '';
   // Clean meta tags
-  document.querySelectorAll('meta[name="description"], meta[property]').forEach((el) => el.remove());
+  document
+    .querySelectorAll('meta[name="description"], meta[property]')
+    .forEach((el) => el.remove());
 });
 
 function createWrapper(metaOrRef: Parameters<typeof useMeta>[0]) {
