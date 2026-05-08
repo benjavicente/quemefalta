@@ -1,52 +1,64 @@
 import { createClient } from '@supabase/supabase-js';
 import { ref, readonly } from 'vue';
+import { createMockClient } from './mockClient';
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const useMock = import.meta.env.VITE_MOCK === 'true';
 
-if (!url || !anonKey) {
-  throw new Error('Missing Supabase env vars. Check your .env.local file in the project root.');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _client: any;
+
+if (useMock) {
+  console.log('%c🧪 MOCK MODE — datos locales en mock-data.json', 'color:#f5c542;font-weight:bold');
+  _client = createMockClient();
+} else {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    throw new Error('Missing Supabase env vars. Check your .env.local file in the project root.');
+  }
+  _client = createClient(url, anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
 }
 
-export const supabase = createClient(url, anonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
+export const supabase = _client;
 
 // === SESSION STATE ===
 // Cuando la sesion muere y no se puede renovar, bloqueamos writes y mostramos popup
 const _sessionDead = ref(false);
 export const sessionDead = readonly(_sessionDead);
 
-// === KEEP-ALIVE: renovar JWT cada 45 min (expira en 60 min en free tier) ===
-setInterval(
-  async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session) {
-      const { error } = await supabase.auth.refreshSession();
-      if (!error) _sessionDead.value = false;
-    }
-  },
-  45 * 60 * 1000,
-);
+// === KEEP-ALIVE & VISIBILITY REFRESH (skip in mock mode) ===
+if (!useMock) {
+  setInterval(
+    async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        const { error } = await supabase.auth.refreshSession();
+        if (!error) _sessionDead.value = false;
+      }
+    },
+    45 * 60 * 1000,
+  );
 
-// Refrescar al volver al tab
-document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState === 'visible') {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session) {
-      const { error } = await supabase.auth.refreshSession();
-      if (!error) _sessionDead.value = false;
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        const { error } = await supabase.auth.refreshSession();
+        if (!error) _sessionDead.value = false;
+      }
     }
-  }
-});
+  });
+}
 
 // === Pre-write: refrescar si lleva rato idle ===
 let lastActivityAt = Date.now();

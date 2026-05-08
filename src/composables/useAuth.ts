@@ -12,11 +12,7 @@ let initPromise: Promise<void> | null = null;
 
 // Cargar profile desde la DB
 async function loadProfile(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
 
   if (error) {
     console.error('Error loading profile:', error);
@@ -55,7 +51,8 @@ async function _doInit() {
 
   // Escuchar cambios FUTUROS en la sesión (login, logout, refresh token)
   // Ignorar INITIAL_SESSION porque ya lo manejamos arriba
-  supabase.auth.onAuthStateChange(async (event, session) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase.auth.onAuthStateChange(async (event: string, session: any) => {
     if (event === 'INITIAL_SESSION') return;
 
     user.value = session?.user ?? null;
