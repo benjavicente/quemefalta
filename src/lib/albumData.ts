@@ -4,82 +4,117 @@ export interface AlbumSection {
   code: string;
   count: number;
   startsAt: number;
+  group?: string;
   isTeam?: boolean;
 }
 
-const TEAM_NAMES = [
-  'Canadá',
-  'México',
-  'EE.UU.',
-  'Argentina',
-  'Brasil',
-  'Uruguay',
-  'Colombia',
-  'Ecuador',
-  'Paraguay',
-  'Chile',
-  'Perú',
-  'Bolivia',
-  'Francia',
-  'Inglaterra',
-  'España',
-  'Alemania',
-  'Portugal',
-  'Italia',
-  'Países Bajos',
-  'Bélgica',
-  'Croacia',
-  'Suiza',
-  'Dinamarca',
-  'Polonia',
-  'Austria',
-  'Serbia',
-  'Ucrania',
-  'Turquía',
-  'Marruecos',
-  'Senegal',
-  'Egipto',
-  'Nigeria',
-  'Túnez',
-  'Argelia',
-  'Camerún',
-  'Ghana',
-  'Japón',
-  'Corea del Sur',
-  'Australia',
-  'Irán',
-  'Arabia Saudita',
-  'Catar',
-  'Nueva Zelanda',
-  'Costa Rica',
-  'Panamá',
-  'Honduras',
-  'Jamaica',
-  'Cabo Verde',
-];
+interface TeamDef {
+  name: string;
+  code: string;
+}
 
-function teamCode(name: string): string {
-  return name
-    .slice(0, 3)
-    .toUpperCase()
-    .replace(/[^A-Z]/g, 'X');
+const GROUPS: Record<string, TeamDef[]> = {
+  A: [
+    { name: 'México', code: 'MEX' },
+    { name: 'Ecuador', code: 'ECU' },
+    { name: 'Curazao', code: 'CUW' },
+    { name: 'Haití', code: 'HAI' },
+  ],
+  B: [
+    { name: 'Estados Unidos', code: 'USA' },
+    { name: 'Colombia', code: 'COL' },
+    { name: 'Nueva Zelanda', code: 'NZL' },
+    { name: 'Panamá', code: 'PAN' },
+  ],
+  C: [
+    { name: 'Canadá', code: 'CAN' },
+    { name: 'Marruecos', code: 'MAR' },
+    { name: 'Irak', code: 'IRQ' },
+    { name: 'Cabo Verde', code: 'CPV' },
+  ],
+  D: [
+    { name: 'Argentina', code: 'ARG' },
+    { name: 'Chequia', code: 'CZE' },
+    { name: 'Sudáfrica', code: 'RSA' },
+    { name: 'Paraguay', code: 'PAR' },
+  ],
+  E: [
+    { name: 'Francia', code: 'FRA' },
+    { name: 'Austria', code: 'AUT' },
+    { name: 'Túnez', code: 'TUN' },
+    { name: 'Uzbekistán', code: 'UZB' },
+  ],
+  F: [
+    { name: 'Brasil', code: 'BRA' },
+    { name: 'Noruega', code: 'NOR' },
+    { name: 'Costa de Marfil', code: 'CIV' },
+    { name: 'Jordania', code: 'JOR' },
+  ],
+  G: [
+    { name: 'Inglaterra', code: 'ENG' },
+    { name: 'Uruguay', code: 'URU' },
+    { name: 'Irán', code: 'IRN' },
+    { name: 'Ghana', code: 'GHA' },
+  ],
+  H: [
+    { name: 'España', code: 'ESP' },
+    { name: 'Turquía', code: 'TUR' },
+    { name: 'Congo DR', code: 'COD' },
+    { name: 'Bosnia y Herzegovina', code: 'BIH' },
+  ],
+  I: [
+    { name: 'Alemania', code: 'GER' },
+    { name: 'Bélgica', code: 'BEL' },
+    { name: 'Argelia', code: 'ALG' },
+    { name: 'Egipto', code: 'EGY' },
+  ],
+  J: [
+    { name: 'Portugal', code: 'POR' },
+    { name: 'Croacia', code: 'CRO' },
+    { name: 'Senegal', code: 'SEN' },
+    { name: 'Escocia', code: 'SCO' },
+  ],
+  K: [
+    { name: 'Países Bajos', code: 'NED' },
+    { name: 'Japón', code: 'JPN' },
+    { name: 'Arabia Saudita', code: 'KSA' },
+    { name: 'Suecia', code: 'SWE' },
+  ],
+  L: [
+    { name: 'Corea del Sur', code: 'KOR' },
+    { name: 'Suiza', code: 'SUI' },
+    { name: 'Catar', code: 'QAT' },
+    { name: 'Australia', code: 'AUS' },
+  ],
+};
+
+// Build team sections: 48 teams × 20 stickers, starting at 21
+const teamSections: AlbumSection[] = [];
+let teamStart = 21;
+for (const [group, teams] of Object.entries(GROUPS)) {
+  for (const team of teams) {
+    teamSections.push({
+      id: `team-${team.code.toLowerCase()}`,
+      name: team.name,
+      code: team.code,
+      count: 20,
+      startsAt: teamStart,
+      group,
+      isTeam: true,
+    });
+    teamStart += 20;
+  }
 }
 
 export const ALBUM_SECTIONS: AlbumSection[] = [
-  { id: 'intro', name: 'Introducción & Mascotas', code: 'INT', count: 18, startsAt: 1 },
-  { id: 'stadiums', name: 'Estadios & Sedes', code: 'STA', count: 32, startsAt: 19 },
-  { id: 'legends', name: 'Leyendas del Mundial', code: 'LEG', count: 20, startsAt: 51 },
-  ...TEAM_NAMES.map((name, i) => ({
-    id: `team-${i}`,
-    name,
-    code: teamCode(name),
-    count: 16,
-    startsAt: 71 + i * 16,
-    isTeam: true,
-  })),
-  { id: 'fwc-trophy', name: 'FIFA World Cup Trophy', code: 'FWC', count: 12, startsAt: 839 },
-  { id: 'specials', name: 'Especiales & Brillantes', code: 'SPE', count: 50, startsAt: 851 },
-  { id: 'icons', name: 'Íconos del Torneo', code: 'ICO', count: 73, startsAt: 901 },
+  {
+    id: 'intro',
+    name: 'Introducción & FIFA Museum',
+    code: 'FWC',
+    count: 20,
+    startsAt: 1,
+  },
+  ...teamSections,
 ];
 
 export const TOTAL_STICKERS = ALBUM_SECTIONS.reduce((sum, s) => sum + s.count, 0);
