@@ -8,33 +8,37 @@
 }
 
 :root {
-  /* Surfaces */
-  --pitch: #0e3b2a;
-  --pitch-deep: #072019;
-  --pitch-soft: #13503a;
-  --paper: #f6f1e1;
-  --paper-deep: #ece5cf;
-  --ink: #0b1612;
-  --ink-soft: #3a4842;
+  /* Surfaces — deep navy-charcoal base, modern & clean */
+  --pitch: #141c2b;
+  --pitch-deep: #0c1220;
+  --pitch-soft: #1c2940;
+  --paper: #f5f0e8;
+  --paper-deep: #e8e0cc;
+  --ink: #0e1218;
+  --ink-soft: #3d4555;
 
-  /* Accents */
-  --gold: #e8b341;
-  --gold-deep: #b8801a;
-  --coral: #e25a3a;
-  --coral-deep: #a83820;
-  --mint: #5fc28a;
-  --red: #c8362b;
+  /* Accents — World Cup 2026 inspired */
+  --gold: #f0b429;
+  --gold-deep: #c98e0c;
+  --coral: #ef5350;
+  --coral-deep: #c62828;
+  --mint: #4dd0a1;
+  --red: #d32f2f;
+
+  /* Brand accent — baby blue nod to the sticker design */
+  --sky: #64b5f6;
+  --sky-deep: #2196f3;
 
   /* System */
-  --line: rgba(246, 241, 225, 0.1);
-  --line-soft: rgba(246, 241, 225, 0.05);
-  --chalk: #f6f1e1;
-  --chalk-dim: rgba(246, 241, 225, 0.55);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-soft: rgba(255, 255, 255, 0.04);
+  --chalk: #f0ece4;
+  --chalk-dim: rgba(240, 236, 228, 0.55);
 
   /* Shadows */
-  --shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
-  --shadow-glow-gold: 0 0 8px rgba(232, 179, 65, 0.4);
-  --shadow-glow-mint: 0 0 8px rgba(95, 194, 138, 0.5);
+  --shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+  --shadow-glow-gold: 0 0 12px rgba(240, 180, 41, 0.3);
+  --shadow-glow-mint: 0 0 12px rgba(77, 208, 161, 0.35);
 
   /* Typography */
   --display: 'Bebas Neue', sans-serif;
@@ -52,8 +56,8 @@ body,
 body {
   background: var(--pitch-deep);
   background-image:
-    repeating-linear-gradient(0deg, transparent 0 60px, rgba(246, 241, 225, 0.012) 60px 61px),
-    radial-gradient(ellipse at 20% -10%, rgba(232, 179, 65, 0.06) 0%, transparent 50%);
+    radial-gradient(ellipse at 50% 0%, rgba(100, 181, 246, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 0% 100%, rgba(240, 180, 41, 0.03) 0%, transparent 50%);
   color: var(--chalk);
   font-family: var(--body);
   font-feature-settings: 'ss01', 'cv11';

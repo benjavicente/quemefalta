@@ -18,11 +18,13 @@ const owned = computed(() => props.state.owned);
 const dupes = computed(() => props.state.dupes);
 const hasNote = computed(() => !!props.state.note);
 
-// Long press detection
+// Long press detection + isPressed guard for paint-mode compatibility
 let pressTimer: ReturnType<typeof setTimeout> | null = null;
 const didLongPress = ref(false);
+const isPressed = ref(false);
 
 function onPointerDown() {
+  isPressed.value = true;
   didLongPress.value = false;
   pressTimer = setTimeout(() => {
     didLongPress.value = true;
@@ -35,9 +37,11 @@ function onPointerUp() {
     clearTimeout(pressTimer);
     pressTimer = null;
   }
-  if (!didLongPress.value) {
+  // Only cycle if this card initiated the press (prevents ghost cycles during swipe paint)
+  if (isPressed.value && !didLongPress.value) {
     emit('cycle');
   }
+  isPressed.value = false;
 }
 
 function onPointerCancel() {
@@ -45,6 +49,7 @@ function onPointerCancel() {
     clearTimeout(pressTimer);
     pressTimer = null;
   }
+  isPressed.value = false;
 }
 </script>
 
@@ -69,11 +74,11 @@ function onPointerCancel() {
           draggable="false"
         />
         <div v-if="!owned" class="stk-img-veil" />
+        <div class="stk-code-overlay" :class="{ 'stk-code-overlay-owned': owned }">{{ code }}</div>
       </div>
       <!-- Footer band -->
       <div class="stk-footer" :class="{ 'stk-footer-owned': owned }">
-        <span class="stk-code" :class="{ 'stk-code-owned': owned }">{{ code }}</span>
-        <span class="stk-num" :class="{ 'stk-num-owned': owned }">{{ number }}</span>
+        <span class="stk-num" :class="{ 'stk-num-owned': owned }">{{ code }}</span>
       </div>
       <!-- Badges -->
       <div v-if="dupes > 0" class="stk-badge">×{{ dupes + 1 }}</div>
@@ -107,7 +112,7 @@ function onPointerCancel() {
 }
 .stk-owned {
   border: 1px solid var(--gold-deep);
-  background: linear-gradient(160deg, #f4d57a 0%, var(--gold) 45%, var(--gold-deep) 100%);
+  background: linear-gradient(160deg, #fcd34d 0%, var(--gold) 45%, var(--gold-deep) 100%);
   box-shadow:
     0 8px 24px rgba(232, 179, 65, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
@@ -142,6 +147,25 @@ function onPointerCancel() {
 .stk-art-owned {
   background: rgba(255, 255, 255, 0.55);
 }
+.stk-code-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--display);
+  font-size: clamp(14px, 3vw, 18px);
+  letter-spacing: 0.06em;
+  color: rgba(246, 241, 225, 0.5);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  z-index: 1;
+  white-space: nowrap;
+}
+.stk-code-overlay-owned {
+  color: var(--pitch-deep);
+  text-shadow: none;
+  opacity: 0.5;
+}
 .stk-img {
   width: 100%;
   height: 100%;
@@ -174,7 +198,7 @@ function onPointerCancel() {
   padding: 0 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
 }
 .stk-footer-owned {
   background: rgba(0, 0, 0, 0.08);
@@ -191,10 +215,11 @@ function onPointerCancel() {
   color: var(--pitch-deep);
 }
 .stk-num {
-  font-family: var(--display);
-  font-size: 22px;
+  font-family: var(--mono);
+  font-size: 11px;
   line-height: 1;
   font-weight: 700;
+  letter-spacing: 0.04em;
   color: rgba(246, 241, 225, 0.45);
 }
 .stk-num-owned {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onUnmounted } from 'vue';
 import StickerCard from '@/components/StickerCard.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { useStickers } from '@/composables/useStickers';
 import type { AlbumSection } from '@/lib/albumData';
 
@@ -13,6 +14,8 @@ const emit = defineEmits<{
 }>();
 
 const { stickers, getSticker, cycleSticker, markSectionComplete, clearSection } = useStickers();
+
+const showClearConfirm = ref(false);
 
 const items = computed(() => {
   return Array.from({ length: props.section.count }, (_, i) => {
@@ -41,9 +44,81 @@ function completeSection() {
   markSectionComplete(props.section.startsAt, props.section.count);
 }
 
-function resetSection() {
+function askClearSection() {
+  showClearConfirm.value = true;
+}
+
+function confirmClear() {
+  showClearConfirm.value = false;
   clearSection(props.section.startsAt, props.section.count);
 }
+
+// ── Paint mode (swipe-to-mark) ──
+const isPainting = ref(false);
+const paintedNums = new Set<number>();
+let paintStart: number | null = null;
+let docMoveHandler: ((e: PointerEvent) => void) | null = null;
+let docUpHandler: (() => void) | null = null;
+
+function stkFromPoint(x: number, y: number): number | null {
+  const el = document.elementFromPoint(x, y);
+  const wrapper = el?.closest('[data-stk]') as HTMLElement | null;
+  if (!wrapper) return null;
+  const n = parseInt(wrapper.dataset.stk!);
+  return isNaN(n) ? null : n;
+}
+
+function onPaintStart(num: number, e: PointerEvent) {
+  if (e.button !== 0) return;
+
+  paintStart = num;
+  isPainting.value = false;
+  paintedNums.clear();
+
+  docMoveHandler = (ev: PointerEvent) => {
+    const n = stkFromPoint(ev.clientX, ev.clientY);
+    if (n === null) return;
+
+    // Moved to a different card → enter paint mode
+    if (!isPainting.value && n !== paintStart) {
+      isPainting.value = true;
+      // Mark the starting card
+      if (paintStart !== null) {
+        paintedNums.add(paintStart);
+        if (!getSticker(paintStart).owned) cycleSticker(paintStart);
+      }
+    }
+
+    // Mark every new card the pointer touches
+    if (isPainting.value && !paintedNums.has(n)) {
+      paintedNums.add(n);
+      if (!getSticker(n).owned) cycleSticker(n);
+    }
+  };
+
+  docUpHandler = () => cleanupPaint();
+
+  document.addEventListener('pointermove', docMoveHandler);
+  document.addEventListener('pointerup', docUpHandler);
+  document.addEventListener('pointercancel', docUpHandler);
+}
+
+function cleanupPaint() {
+  if (docMoveHandler) {
+    document.removeEventListener('pointermove', docMoveHandler);
+    docMoveHandler = null;
+  }
+  if (docUpHandler) {
+    document.removeEventListener('pointerup', docUpHandler);
+    document.removeEventListener('pointercancel', docUpHandler);
+    docUpHandler = null;
+  }
+  paintStart = null;
+  isPainting.value = false;
+  paintedNums.clear();
+}
+
+onUnmounted(() => cleanupPaint());
 </script>
 
 <template>
@@ -51,22 +126,25 @@ function resetSection() {
     <header class="sect-head">
       <div>
         <div class="sect-name">{{ section.name }}</div>
-        <div class="sect-meta">
-          #{{ section.startsAt }}—{{ section.startsAt + section.count - 1 }}
-        </div>
+        <div class="sect-meta">{{ section.code }}1—{{ section.code }}{{ section.count }}</div>
       </div>
       <div class="sect-badge">{{ ownedCount }}/{{ section.count }}</div>
     </header>
     <div class="sect-grid">
-      <StickerCard
+      <div
         v-for="item in items"
         :key="item.number"
-        :number="item.number"
-        :code="item.code"
-        :state="item.state"
-        @cycle="cycleSticker(item.number)"
-        @open-detail="emit('openDetail', item.number)"
-      />
+        :data-stk="item.number"
+        @pointerdown="onPaintStart(item.number, $event)"
+      >
+        <StickerCard
+          :number="item.number"
+          :code="item.code"
+          :state="item.state"
+          @cycle="cycleSticker(item.number)"
+          @open-detail="emit('openDetail', item.number)"
+        />
+      </div>
     </div>
     <div class="sect-actions">
       <div class="sect-btns">
@@ -88,7 +166,7 @@ function resetSection() {
           v-if="hasAny"
           class="clear-btn"
           :title="`Quitar las ${ownedCount} pegadas de ${section.name}`"
-          @click="resetSection"
+          @click="askClearSection"
         >
           <svg
             width="14"
@@ -108,6 +186,16 @@ function resetSection() {
         {{ ownedCount }} pegadas
       </div>
     </div>
+    <!-- Confirm clear dialog -->
+    <ConfirmDialog
+      v-if="showClearConfirm"
+      title="¿Quitar pegadas?"
+      :message="`Vas a quitar las ${ownedCount} láminas pegadas de ${section.name}. Esta acción no se puede deshacer.`"
+      confirm-text="Sí, quitar todas"
+      :danger="true"
+      @confirm="confirmClear"
+      @cancel="showClearConfirm = false"
+    />
   </section>
 </template>
 

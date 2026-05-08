@@ -7,12 +7,17 @@ const props = defineProps<{
   code: string;
   sectionName: string;
   state: StickerState;
+  hasPrev?: boolean;
+  hasNext?: boolean;
 }>();
 
 const emit = defineEmits<{
   update: [state: { dupes: number; note: string }];
   remove: [];
+  mark: [];
   close: [];
+  prev: [];
+  next: [];
 }>();
 
 const dupes = ref(props.state.dupes);
@@ -48,12 +53,32 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
     <div class="pop" @click.stop>
       <!-- Header -->
       <div class="pop-head">
-        <div class="pop-thumb">{{ stickerNumber }}</div>
+        <button v-if="hasPrev" class="pop-nav pop-prev" @click="emit('prev')">‹</button>
+        <div class="pop-thumb">{{ code }}</div>
         <div class="pop-info">
           <div class="pop-label">LÁMINA</div>
-          <div class="pop-title">#{{ stickerNumber }} · {{ sectionName }}</div>
+          <div class="pop-title">{{ code }} · {{ sectionName }}</div>
         </div>
+        <button v-if="hasNext" class="pop-nav pop-next" @click="emit('next')">›</button>
         <button class="pop-close" @click="emit('close')">×</button>
+      </div>
+
+      <!-- Not owned state -->
+      <div v-if="!state.owned" class="unowned-state">
+        <div class="unowned-msg">No tienes esta lámina</div>
+        <button class="btn-mark" @click="emit('mark')">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Marcar como tenida
+        </button>
       </div>
 
       <!-- Count stepper -->
@@ -152,7 +177,7 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
 .pop-bg {
   position: fixed;
   inset: 0;
-  background: rgba(7, 32, 25, 0.65);
+  background: rgba(12, 18, 32, 0.65);
   backdrop-filter: blur(3px);
   display: flex;
   align-items: flex-end;
@@ -161,7 +186,7 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
   animation: fadeIn 0.12s ease-out;
 }
 .pop {
-  background: #0e3b2a;
+  background: #141c2b;
   border: 1px solid var(--line);
   border-radius: 12px 12px 0 0;
   padding: 20px 18px 28px;
@@ -188,6 +213,28 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
   }
 }
 
+/* Nav arrows */
+.pop-nav {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(246, 241, 225, 0.06);
+  border: 1px solid var(--line);
+  color: var(--chalk);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+.pop-nav:hover {
+  background: rgba(232, 179, 65, 0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
 /* Header */
 .pop-head {
   display: flex;
@@ -196,19 +243,20 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
   margin-bottom: 14px;
 }
 .pop-thumb {
-  width: 36px;
+  min-width: 42px;
   height: 48px;
   border-radius: 5px;
   background: linear-gradient(160deg, #f4d57a, var(--gold) 60%, var(--gold-deep));
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding-bottom: 4px;
+  padding: 0 6px;
   color: var(--pitch-deep);
-  font-family: var(--display);
-  font-size: 18px;
+  font-family: var(--mono);
+  font-size: 11px;
   line-height: 1;
   font-weight: 700;
+  letter-spacing: 0.02em;
   box-shadow: 0 4px 10px rgba(232, 179, 65, 0.25);
 }
 .pop-info {
@@ -476,6 +524,37 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
   font-family: inherit;
 }
 .btn-save:hover {
+  background: var(--gold-deep);
+}
+
+/* Unowned state */
+.unowned-state {
+  text-align: center;
+  padding: 16px 0 8px;
+}
+.unowned-msg {
+  font-size: 13px;
+  color: rgba(246, 241, 225, 0.55);
+  margin-bottom: 14px;
+}
+.btn-mark {
+  width: 100%;
+  padding: 14px 0;
+  background: var(--gold);
+  color: var(--pitch-deep);
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-mark:hover {
   background: var(--gold-deep);
 }
 

@@ -137,7 +137,7 @@ async function setSticker(stickerNumber: number, newState: StickerState) {
   }
 }
 
-// Tap: vacio → owned → ×2 → ×3 → vacio (capped at ×3)
+// Tap: vacio → owned → ×2 → ×3 (se queda en ×3, para quitar usar modal)
 function cycleSticker(stickerNumber: number) {
   if (inFlight.has(stickerNumber)) return;
   const current = stickers.value[stickerNumber] ?? defaultState();
@@ -145,10 +145,94 @@ function cycleSticker(stickerNumber: number) {
     setSticker(stickerNumber, { ...current, owned: true, dupes: 0 });
   } else if (current.dupes < 2) {
     setSticker(stickerNumber, { ...current, dupes: current.dupes + 1 });
-  } else {
-    // ×3 → back to empty
-    setSticker(stickerNumber, { owned: false, dupes: 0, note: '' });
   }
+  // ×3 se queda — no vuelve a vacío por tap accidental
+}
+
+// Agregar múltiples stickers de golpe (ingreso por lotes)
+// Duplicates in the array are treated as extra copies (dupes).
+async function addBatch(stickerNumbers: number[]) {
+  const { user } = useAuth();
+  if (!user.value || sectionInFlight) return;
+  sectionInFlight = true;
+
+  if (!(await ensureFreshSession())) {
+    syncError.value = 'Sesión expirada. Recarga la página.';
+    sectionInFlight = false;
+    return;
+  }
+
+  // Count occurrences of each sticker number
+  const counts = new Map<number, number>();
+  for (const num of stickerNumbers) {
+    if (num < 1 || num > TOTAL_STICKERS) continue;
+    counts.set(num, (counts.get(num) || 0) + 1);
+  }
+
+  const toUpsert: { num: number; prev: StickerState | undefined; newState: StickerState }[] = [];
+  for (const [num, count] of counts) {
+    const existing = stickers.value[num];
+    if (!existing?.owned) {
+      // Not owned yet → mark owned, extra copies become dupes
+      toUpsert.push({
+        num,
+        prev: existing,
+        newState: { owned: true, dupes: count - 1, note: existing?.note ?? '' },
+      });
+    } else if (count > 1) {
+      // Already owned, but input has duplicates → add those as extra dupes
+      toUpsert.push({
+        num,
+        prev: existing,
+        newState: { ...existing, dupes: existing.dupes + (count - 1) },
+      });
+    }
+    // If already owned and count === 1, nothing to do
+  }
+
+  if (toUpsert.length === 0) {
+    sectionInFlight = false;
+    return 0;
+  }
+
+  // Optimistic
+  const newMap = { ...stickers.value };
+  for (const { num, newState } of toUpsert) {
+    newMap[num] = newState;
+  }
+  stickers.value = newMap;
+
+  const rows = toUpsert.map(({ num, newState }) => ({
+    user_id: user.value!.id,
+    sticker_number: num,
+    owned: newState.owned,
+    dupes: newState.dupes,
+    note: newState.note || null,
+  }));
+
+  const { error } = await withAuthRetry(() =>
+    supabase.from('stickers').upsert(rows, { onConflict: 'user_id,sticker_number' }),
+  );
+
+  if (error) {
+    console.error('[useStickers] Batch add error:', error);
+    const revertMap = { ...stickers.value };
+    for (const { num, prev } of toUpsert) {
+      if (prev) {
+        revertMap[num] = prev;
+      } else {
+        delete revertMap[num];
+      }
+    }
+    stickers.value = revertMap;
+    syncError.value = error.message;
+    sectionInFlight = false;
+    return 0;
+  }
+
+  syncError.value = null;
+  sectionInFlight = false;
+  return toUpsert.length;
 }
 
 // Quitar sticker completamente
@@ -352,6 +436,7 @@ export function useStickers() {
     removeSticker,
     markSectionComplete,
     clearSection,
+    addBatch,
     setNote,
   };
 }

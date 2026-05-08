@@ -13,7 +13,7 @@ interface TeamDef {
   code: string;
 }
 
-const GROUPS: Record<string, TeamDef[]> = {
+export const GROUPS: Record<string, TeamDef[]> = {
   A: [
     { name: 'México', code: 'MEX' },
     { name: 'Ecuador', code: 'ECU' },
@@ -131,4 +131,18 @@ export function codeForSticker(stickerNumber: number): string {
   if (!sec) return `?${stickerNumber}`;
   const indexInSection = stickerNumber - sec.startsAt + 1;
   return `${sec.code}${indexInSection}`;
+}
+
+/**
+ * Inverse of codeForSticker: "MEX5" → 25, "FWC1" → 1
+ * Returns undefined if code is invalid.
+ */
+export function stickerNumberFromCode(code: string): number | undefined {
+  const match = code.toUpperCase().match(/^([A-Z]+)(\d+)$/);
+  if (!match) return undefined;
+  const [, prefix, numStr] = match;
+  const idx = parseInt(numStr);
+  const sec = ALBUM_SECTIONS.find((s) => s.code === prefix);
+  if (!sec || idx < 1 || idx > sec.count) return undefined;
+  return sec.startsAt + idx - 1;
 }

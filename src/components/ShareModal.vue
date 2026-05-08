@@ -116,7 +116,7 @@ function viewPublic() {
 .modal-bg {
   position: fixed;
   inset: 0;
-  background: rgba(7, 32, 25, 0.6);
+  background: rgba(12, 18, 32, 0.75);
   backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
