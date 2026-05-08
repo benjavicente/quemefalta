@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { supabase, ensureFreshSession } from '@/lib/supabase';
 import { useAuth } from '@/composables/useAuth';
+import { useMeta } from '@/composables/useMeta';
 import { TOTAL_STICKERS } from '@/lib/albumData';
 
 interface PublicProfile {
@@ -42,6 +43,23 @@ const stats = computed(() => {
 const firstName = computed(() => {
   return profile.value?.display_name?.split(' ')[0] ?? profile.value?.username;
 });
+
+const metaInfo = computed(() => {
+  if (!profile.value) {
+    return {
+      title: 'Cargando perfil... — QueMeFalta',
+    };
+  }
+  const name = profile.value.display_name || profile.value.username;
+  return {
+    title: `${name} — ${stats.value.pct}% del álbum — QueMeFalta`,
+    description: `${name} tiene ${stats.value.owned} de ${TOTAL_STICKERS} láminas del álbum del Mundial 2026 (${stats.value.pct}% completo). Mira su progreso y conecta para canjear.`,
+    ogTitle: `${name} — ${stats.value.pct}% del álbum del Mundial`,
+    ogDescription: `${stats.value.owned} láminas de ${TOTAL_STICKERS} (${stats.value.pct}% completo). ${stats.value.dupes > 0 ? `${stats.value.dupes} repetidas para canjear.` : ''}`,
+  };
+});
+
+useMeta(metaInfo);
 
 const userInitial = computed(() => {
   const name = profile.value?.display_name || profile.value?.username || '?';

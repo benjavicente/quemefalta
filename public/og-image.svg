@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#062318"/>
+      <stop offset="100%" stop-color="#0a3d2e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="80%" cy="20%">
+      <stop offset="0%" stop-color="#f5c542" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#f5c542" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <text x="1080" y="280" font-size="320" fill="#f5c542" opacity="0.12" text-anchor="middle" font-family="serif">★</text>
+
+  <text x="80" y="200" font-family="Bebas Neue, Impact, sans-serif" font-size="36" fill="#d9d4c4" letter-spacing="6">PANINI · FIFA WORLD CUP 2026</text>
+  <text x="80" y="380" font-family="Bebas Neue, Impact, Helvetica Neue, sans-serif" font-size="140" font-weight="800" fill="#f4f1e8" letter-spacing="-2">QUEMEFALTA</text>
+  <text x="80" y="450" font-family="system-ui, sans-serif" font-size="32" fill="#d9d4c4" font-weight="600">Marca tus láminas. Comparte tu progreso.</text>
+
+  <line x1="80" y1="510" x2="280" y2="510" stroke="#f5c542" stroke-width="4"/>
+  <text x="80" y="560" font-family="system-ui, monospace" font-size="22" fill="#f5c542" letter-spacing="4">★ QUEMEFALTA.VERCEL.APP</text>
+</svg>

@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useStickers } from '@/composables/useStickers';
+import { useMeta } from '@/composables/useMeta';
 import { ALBUM_SECTIONS, TOTAL_STICKERS, sectionForSticker } from '@/lib/albumData';
 import SectionView from '@/components/SectionView.vue';
 import StickerDetailModal from '@/components/StickerDetailModal.vue';
@@ -50,6 +51,12 @@ const detailSectionName = computed(() => {
 const currentSection = computed(() => {
   return ALBUM_SECTIONS.find((s) => s.id === activeSection.value) ?? ALBUM_SECTIONS[0];
 });
+
+const albumMeta = computed(() => ({
+  title: `Mi álbum (${stats.value.pct}%) — QueMeFalta`,
+}));
+
+useMeta(albumMeta);
 
 const sectionsWithCounts = computed(() => {
   return ALBUM_SECTIONS.map((sec) => {
