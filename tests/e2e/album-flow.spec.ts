@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { setupSupabaseRoutes, injectSession } from './fixtures/handlers';
-import { TEST_PROFILE, SUPABASE_URL, generateStickerRows } from './fixtures/data';
+import { TEST_PROFILE, SUPABASE_URL } from './fixtures/data';
 
 test.describe('Album Flow', () => {
   test.beforeEach(async ({ page }) => {

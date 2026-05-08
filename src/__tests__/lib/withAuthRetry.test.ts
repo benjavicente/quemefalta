@@ -39,7 +39,6 @@ beforeEach(async () => {
 
         const result = await fn();
         if (!result.error) {
-
           return result;
         }
         if (!isAuthError(result.error)) return result;
@@ -52,7 +51,6 @@ beforeEach(async () => {
           }
           const retry = await fn();
           if (!retry.error) {
-  
             return retry;
           }
           if (!isAuthError(retry.error)) return retry;

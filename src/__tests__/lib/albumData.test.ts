@@ -1,7 +1,40 @@
 import { describe, it, expect } from 'vitest';
-import { ALBUM_SECTIONS, TOTAL_STICKERS, sectionForSticker, codeForSticker } from '@/lib/albumData';
+import {
+  ALBUM_SECTIONS,
+  TOTAL_STICKERS,
+  GROUPS,
+  sectionForSticker,
+  codeForSticker,
+  stickerNumberFromCode,
+} from '@/lib/albumData';
 
 describe('albumData', () => {
+  describe('GROUPS', () => {
+    it('exports GROUPS with 12 groups (A-L)', () => {
+      expect(Object.keys(GROUPS)).toHaveLength(12);
+      for (const g of 'ABCDEFGHIJKL') {
+        expect(GROUPS[g]).toBeDefined();
+      }
+    });
+
+    it('each group has 4 teams', () => {
+      for (const g of 'ABCDEFGHIJKL') {
+        expect(GROUPS[g]).toHaveLength(4);
+      }
+    });
+
+    it('each team has name and code', () => {
+      for (const g of 'ABCDEFGHIJKL') {
+        for (const team of GROUPS[g]) {
+          expect(team.name).toBeDefined();
+          expect(team.code).toBeDefined();
+          expect(typeof team.name).toBe('string');
+          expect(typeof team.code).toBe('string');
+        }
+      }
+    });
+  });
+
   describe('ALBUM_SECTIONS', () => {
     it('has 49 sections (1 intro + 48 teams)', () => {
       expect(ALBUM_SECTIONS).toHaveLength(49);
@@ -112,6 +145,46 @@ describe('albumData', () => {
     it('returns ?N for invalid sticker number', () => {
       expect(codeForSticker(999)).toBe('?999');
       expect(codeForSticker(0)).toBe('?0');
+    });
+  });
+
+  describe('stickerNumberFromCode', () => {
+    it('returns 1 for FWC1', () => {
+      expect(stickerNumberFromCode('FWC1')).toBe(1);
+    });
+
+    it('returns 21 for MEX1', () => {
+      expect(stickerNumberFromCode('MEX1')).toBe(21);
+    });
+
+    it('returns 40 for MEX20', () => {
+      expect(stickerNumberFromCode('MEX20')).toBe(40);
+    });
+
+    it('is case insensitive', () => {
+      expect(stickerNumberFromCode('mex1')).toBe(21);
+      expect(stickerNumberFromCode('Mex5')).toBe(25);
+    });
+
+    it('returns undefined for invalid code prefix', () => {
+      expect(stickerNumberFromCode('ZZZ1')).toBeUndefined();
+    });
+
+    it('returns undefined for out-of-range index', () => {
+      expect(stickerNumberFromCode('MEX0')).toBeUndefined();
+      expect(stickerNumberFromCode('MEX21')).toBeUndefined();
+    });
+
+    it('returns undefined for non-code strings', () => {
+      expect(stickerNumberFromCode('hello')).toBeUndefined();
+      expect(stickerNumberFromCode('')).toBeUndefined();
+    });
+
+    it('is the inverse of codeForSticker', () => {
+      for (let n = 1; n <= 980; n++) {
+        const code = codeForSticker(n);
+        expect(stickerNumberFromCode(code)).toBe(n);
+      }
     });
   });
 });

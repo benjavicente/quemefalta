@@ -18,9 +18,8 @@ function mountCard(state: Partial<StickerState> = {}) {
 
 describe('StickerCard', () => {
   describe('rendering', () => {
-    it('renders sticker number and code', () => {
+    it('renders sticker code', () => {
       const w = mountCard();
-      expect(w.text()).toContain('42');
       expect(w.text()).toContain('MEX2');
     });
 

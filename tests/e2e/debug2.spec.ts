@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 import { setupSupabaseRoutes, injectSession } from './fixtures/handlers';
-import { TEST_PROFILE, SUPABASE_URL } from './fixtures/data';
+import { TEST_PROFILE } from './fixtures/data';
 
 test('debug album page', async ({ page }) => {
   // Log ALL network requests

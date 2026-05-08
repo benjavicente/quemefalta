@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Page, Route } from '@playwright/test';
 import { SUPABASE_URL, TEST_USER, TEST_SESSION, TEST_PROFILE } from './data';
 

@@ -65,7 +65,7 @@ describe('SectionView', () => {
 
     it('renders sticker range', () => {
       const w = mountSection();
-      expect(w.find('.sect-meta').text()).toContain('#21—40');
+      expect(w.find('.sect-meta').text()).toContain('MEX1—MEX20');
     });
 
     it('renders correct number of StickerCards', () => {
@@ -121,11 +121,16 @@ describe('SectionView', () => {
       expect(w.find('.clear-btn').exists()).toBe(false);
     });
 
-    it('calls clearSection on click', async () => {
+    it('calls clearSection on click after confirm', async () => {
       const w = mountSection({
         21: { owned: true, dupes: 0, note: '' },
       });
       await w.find('.clear-btn').trigger('click');
+
+      // ConfirmDialog should appear
+      const confirmBtn = w.find('.cd-danger');
+      expect(confirmBtn.exists()).toBe(true);
+      await confirmBtn.trigger('click');
 
       expect(mockClearSection).toHaveBeenCalledWith(21, 20);
     });

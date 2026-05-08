@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Profile } from '@/types/app';
 import type { StickerState } from '@/composables/useStickers';
 

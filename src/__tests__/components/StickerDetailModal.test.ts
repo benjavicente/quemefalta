@@ -16,9 +16,9 @@ function mountModal(state: Partial<StickerState> = { owned: true }) {
 
 describe('StickerDetailModal', () => {
   describe('rendering', () => {
-    it('renders sticker number and section name', () => {
+    it('renders sticker code and section name', () => {
       const w = mountModal();
-      expect(w.text()).toContain('42');
+      expect(w.text()).toContain('MEX2');
       expect(w.text()).toContain('México');
     });
 
@@ -115,6 +115,26 @@ describe('StickerDetailModal', () => {
     });
   });
 
+  describe('unowned state', () => {
+    it('shows "Marcar como tenida" button when not owned', () => {
+      const w = mountModal({ owned: false });
+      expect(w.text()).toContain('No tienes esta lámina');
+      expect(w.text()).toContain('Marcar como tenida');
+    });
+
+    it('emits mark when mark button is clicked', async () => {
+      const w = mountModal({ owned: false });
+      await w.find('.btn-mark').trigger('click');
+
+      expect(w.emitted('mark')).toHaveLength(1);
+    });
+
+    it('hides mark button when owned', () => {
+      const w = mountModal({ owned: true });
+      expect(w.find('.btn-mark').exists()).toBe(false);
+    });
+  });
+
   describe('actions', () => {
     it('save emits update with current dupes and note', async () => {
       const w = mountModal({ owned: true, dupes: 1, note: 'test' });
@@ -149,6 +169,74 @@ describe('StickerDetailModal', () => {
       const w = mountModal({ owned: false });
       expect(w.find('.btn-save').exists()).toBe(false);
       expect(w.find('.btn-remove').exists()).toBe(false);
+    });
+  });
+
+  describe('navigation buttons', () => {
+    it('renders prev button when hasPrev is true', () => {
+      const w = mount(StickerDetailModal, {
+        props: {
+          stickerNumber: 42,
+          code: 'MEX2',
+          sectionName: 'México',
+          state: { owned: true, dupes: 0, note: '' },
+          hasPrev: true,
+        },
+      });
+      expect(w.find('.pop-prev').exists()).toBe(true);
+    });
+
+    it('does not render prev button when hasPrev is false', () => {
+      const w = mountModal();
+      expect(w.find('.pop-prev').exists()).toBe(false);
+    });
+
+    it('renders next button when hasNext is true', () => {
+      const w = mount(StickerDetailModal, {
+        props: {
+          stickerNumber: 42,
+          code: 'MEX2',
+          sectionName: 'México',
+          state: { owned: true, dupes: 0, note: '' },
+          hasNext: true,
+        },
+      });
+      expect(w.find('.pop-next').exists()).toBe(true);
+    });
+
+    it('does not render next button when hasNext is false', () => {
+      const w = mountModal();
+      expect(w.find('.pop-next').exists()).toBe(false);
+    });
+
+    it('emits prev when prev button is clicked', async () => {
+      const w = mount(StickerDetailModal, {
+        props: {
+          stickerNumber: 42,
+          code: 'MEX2',
+          sectionName: 'México',
+          state: { owned: true, dupes: 0, note: '' },
+          hasPrev: true,
+        },
+      });
+      await w.find('.pop-prev').trigger('click');
+
+      expect(w.emitted('prev')).toHaveLength(1);
+    });
+
+    it('emits next when next button is clicked', async () => {
+      const w = mount(StickerDetailModal, {
+        props: {
+          stickerNumber: 42,
+          code: 'MEX2',
+          sectionName: 'México',
+          state: { owned: true, dupes: 0, note: '' },
+          hasNext: true,
+        },
+      });
+      await w.find('.pop-next').trigger('click');
+
+      expect(w.emitted('next')).toHaveLength(1);
     });
   });
 });

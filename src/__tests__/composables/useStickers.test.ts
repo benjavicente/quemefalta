@@ -128,7 +128,7 @@ describe('useStickers', () => {
       expect(stickers.value[10]?.dupes).toBe(2);
     });
 
-    it('cycles owned(2 dupes) → empty (reset)', async () => {
+    it('stops cycling at owned(2 dupes) — does not cycle back to empty', async () => {
       setQueryResult({
         data: [createStickerDbRow(10, { owned: true, dupes: 2, note: null })],
         error: null,
@@ -141,8 +141,9 @@ describe('useStickers', () => {
       cycleSticker(10);
       await flushPromises();
 
-      // Should be removed (default state)
-      expect(stickers.value[10]).toBeUndefined();
+      // Should stay at owned(2 dupes) — cycleSticker does not cycle back to empty
+      expect(stickers.value[10]?.owned).toBe(true);
+      expect(stickers.value[10]?.dupes).toBe(2);
     });
   });
 
