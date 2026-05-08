@@ -8,17 +8,35 @@
 }
 
 :root {
-  --pitch: #0a3d2e;
-  --pitch-deep: #062318;
-  --chalk: #f4f1e8;
-  --chalk-dim: #d9d4c4;
-  --paper: #faf7ee;
-  --gold: #f5c542;
-  --gold-deep: #c89a1f;
-  --red: #c8362b;
-  --line: rgba(255, 255, 255, 0.12);
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 32px rgba(0, 0, 0, 0.35);
+  /* Surfaces */
+  --pitch: #0e3b2a;
+  --pitch-deep: #072019;
+  --pitch-soft: #13503a;
+  --paper: #f6f1e1;
+  --paper-deep: #ece5cf;
+  --ink: #0b1612;
+  --ink-soft: #3a4842;
 
+  /* Accents */
+  --gold: #e8b341;
+  --gold-deep: #b8801a;
+  --coral: #e25a3a;
+  --coral-deep: #a83820;
+  --mint: #5fc28a;
+  --red: #c8362b;
+
+  /* System */
+  --line: rgba(246, 241, 225, 0.1);
+  --line-soft: rgba(246, 241, 225, 0.05);
+  --chalk: #f6f1e1;
+  --chalk-dim: rgba(246, 241, 225, 0.55);
+
+  /* Shadows */
+  --shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+  --shadow-glow-gold: 0 0 8px rgba(232, 179, 65, 0.4);
+  --shadow-glow-mint: 0 0 8px rgba(95, 194, 138, 0.5);
+
+  /* Typography */
   --display: 'Bebas Neue', sans-serif;
   --body: 'Archivo', sans-serif;
   --mono: 'JetBrains Mono', monospace;
@@ -34,9 +52,8 @@ body,
 body {
   background: var(--pitch-deep);
   background-image:
-    repeating-linear-gradient(0deg, transparent 0 60px, rgba(255, 255, 255, 0.015) 60px 61px),
-    radial-gradient(ellipse at 30% 0%, rgba(245, 197, 66, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 70% 100%, rgba(10, 61, 46, 0.5) 0%, transparent 50%);
+    repeating-linear-gradient(0deg, transparent 0 60px, rgba(246, 241, 225, 0.012) 60px 61px),
+    radial-gradient(ellipse at 20% -10%, rgba(232, 179, 65, 0.06) 0%, transparent 50%);
   color: var(--chalk);
   font-family: var(--body);
   font-feature-settings: 'ss01', 'cv11';
