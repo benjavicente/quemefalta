@@ -26,3 +26,12 @@ dist-ssr
 # Test artifacts
 playwright-report
 test-results
+
+# Mock data (local dev only)
+mock-data.json
+
+# Claude Code
+.claude/
+
+# Coverage reports
+coverage/
