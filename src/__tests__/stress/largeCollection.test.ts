@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { flushPromises } from '@vue/test-utils';
 import * as mockSupabase from '../mocks/supabase';
 import { createUser, createStickerDbRow } from '../mocks/factories';
 
-const { supabase, setQueryResult, resetSupabaseMock } = mockSupabase;
+const { setQueryResult, resetSupabaseMock } = mockSupabase;
 
 const mockUser = createUser();
 

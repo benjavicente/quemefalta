@@ -36,6 +36,7 @@ const view = ref<'album' | 'missing' | 'dupes'>('album');
 watch(activeSection, (id) => {
   router.replace({ hash: `#${id}` });
 });
+const reloadPage = () => location.reload();
 const detailFor = ref<number | null>(null);
 const shareOpen = ref(false);
 const showCoach = ref(false);
@@ -205,7 +206,7 @@ const userInitial = computed(() => {
         <p class="dead-text">
           Tus últimos cambios no se guardaron. Recarga la página para reconectar con el servidor.
         </p>
-        <button class="dead-btn" @click="location.reload()">Recargar página</button>
+        <button class="dead-btn" @click="reloadPage">Recargar página</button>
       </div>
     </div>
 

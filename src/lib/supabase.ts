@@ -88,7 +88,7 @@ function isAuthError(error: { message: string; code?: string }): boolean {
 }
 
 export async function withAuthRetry<T>(
-  fn: () => Promise<{ data: T; error: { message: string; code?: string } | null }>,
+  fn: () => PromiseLike<{ data: T; error: { message: string; code?: string } | null }>,
 ): Promise<{ data: T; error: { message: string; code?: string } | null }> {
   if (_sessionDead.value) {
     return { data: null as T, error: { message: 'Sesión expirada', code: 'session_dead' } };

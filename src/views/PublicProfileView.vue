@@ -58,8 +58,7 @@ onMounted(async () => {
       .from('public_album_stats')
       .select('*')
       .eq('username', username.value)
-      .maybeSingle()
-      .abortSignal(AbortSignal.timeout(8000));
+      .maybeSingle();
 
     if (error) {
       console.error('Error loading public profile:', error);

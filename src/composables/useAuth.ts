@@ -16,8 +16,7 @@ async function loadProfile(userId: string) {
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single()
-    .abortSignal(AbortSignal.timeout(8000));
+    .single();
 
   if (error) {
     console.error('Error loading profile:', error);

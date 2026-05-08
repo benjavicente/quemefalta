@@ -14,8 +14,6 @@ beforeEach(async () => {
     const { ref, readonly } = await import('vue');
     const _sessionDead = ref(false);
 
-    let lastActivityAt = Date.now();
-
     function isAuthError(error: { message: string; code?: string }): boolean {
       const msg = error.message?.toLowerCase() ?? '';
       return (
@@ -41,7 +39,7 @@ beforeEach(async () => {
 
         const result = await fn();
         if (!result.error) {
-          lastActivityAt = Date.now();
+
           return result;
         }
         if (!isAuthError(result.error)) return result;
@@ -54,7 +52,7 @@ beforeEach(async () => {
           }
           const retry = await fn();
           if (!retry.error) {
-            lastActivityAt = Date.now();
+  
             return retry;
           }
           if (!isAuthError(retry.error)) return retry;

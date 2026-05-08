@@ -32,8 +32,7 @@ async function loadStickers(userId: string, force = false) {
   const { data, error } = await supabase
     .from('stickers')
     .select('sticker_number, owned, dupes, note')
-    .eq('user_id', userId)
-    .abortSignal(AbortSignal.timeout(8000));
+    .eq('user_id', userId);
 
   if (error) {
     console.error('[useStickers] Load error:', error);
