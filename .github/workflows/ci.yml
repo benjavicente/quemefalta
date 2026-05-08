@@ -21,4 +21,26 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
-      - run: npm run test:run
+      - run: npx vitest run --coverage
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -f coverage/coverage-final.json ]; then
+            node -e "
+              const d = require('./coverage/coverage-final.json');
+              let sT=0,sC=0,fT=0,fC=0;
+              for (const f of Object.keys(d)) {
+                const c=d[f];
+                const s=Object.values(c.s), fn=Object.values(c.f);
+                sT+=s.length; sC+=s.filter(x=>x>0).length;
+                fT+=fn.length; fC+=fn.filter(x=>x>0).length;
+              }
+              const sp=((sC/sT)*100).toFixed(1);
+              const fp=((fC/fT)*100).toFixed(1);
+              console.log('## Coverage Report');
+              console.log('| Metric | Coverage |');
+              console.log('|--------|----------|');
+              console.log('| Statements | **'+sp+'%** ('+sC+'/'+sT+') |');
+              console.log('| Functions | **'+fp+'%** ('+fC+'/'+fT+') |');
+            " >> "$GITHUB_STEP_SUMMARY"
+          fi
