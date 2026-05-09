@@ -122,6 +122,33 @@ describe('useShare', () => {
     });
   });
 
+  describe('openExternalUrl()', () => {
+    it('creates a temporary anchor and invokes click for https URLs', () => {
+      const appendSpy = vi.spyOn(document.body, 'appendChild');
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      const removeSpy = vi.spyOn(Element.prototype, 'remove').mockImplementation(() => {});
+
+      const { openExternalUrl } = useShare();
+      openExternalUrl('https://example.com/path');
+
+      expect(appendSpy).toHaveBeenCalled();
+      expect(clickSpy).toHaveBeenCalled();
+      expect(removeSpy).toHaveBeenCalled();
+
+      appendSpy.mockRestore();
+      removeSpy.mockRestore();
+      clickSpy.mockRestore();
+    });
+
+    it('no-ops for non-http URLs', () => {
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      const { openExternalUrl } = useShare();
+      openExternalUrl('mailto:test@example.com');
+      expect(clickSpy).not.toHaveBeenCalled();
+      clickSpy.mockRestore();
+    });
+  });
+
   describe('lastResult', () => {
     it('updates after successful share', async () => {
       Object.defineProperty(navigator, 'share', {

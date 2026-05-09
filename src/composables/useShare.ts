@@ -67,6 +67,24 @@ export function useShare() {
     return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
+  /**
+   * Opens https URLs in a new browsing context. Plain `<a target="_blank">` is unreliable in
+   * iOS standalone/PWA; programmatically clicking a temporary anchor matches Safari user-gesture rules.
+   */
+  function openExternalUrl(url: string): void {
+    if (!url.startsWith('http')) return;
+    const doc = globalThis.document;
+    if (!doc?.body) return;
+    const a = doc.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.style.display = 'none';
+    doc.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
   return {
     isNativeShareAvailable,
     lastResult,
@@ -76,5 +94,6 @@ export function useShare() {
     whatsappLink,
     linkedinLink,
     emailLink,
+    openExternalUrl,
   };
 }

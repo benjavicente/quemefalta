@@ -6,6 +6,10 @@ import { createProfile } from '../mocks/factories';
 const mockShare = vi.fn().mockResolvedValue('shared');
 const mockCopyOnly = vi.fn().mockResolvedValue(true);
 
+const { mockOpenExternal } = vi.hoisted(() => ({
+  mockOpenExternal: vi.fn(),
+}));
+
 vi.mock('@/composables/useShare', () => ({
   useShare: () => ({
     share: mockShare,
@@ -17,6 +21,7 @@ vi.mock('@/composables/useShare', () => ({
     emailLink: (subject: string, body: string) =>
       `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
     isNativeShareAvailable: false,
+    openExternalUrl: mockOpenExternal,
     lastResult: { value: null },
     errorMessage: { value: '' },
   }),
@@ -33,6 +38,7 @@ function mountModal() {
 beforeEach(() => {
   mockShare.mockClear();
   mockCopyOnly.mockClear();
+  mockOpenExternal.mockClear();
 });
 
 describe('ShareModal', () => {
@@ -63,6 +69,20 @@ describe('ShareModal', () => {
       const w = mountModal();
       const linkedinLink = w.findAll('.social-btn')[1];
       expect(linkedinLink.attributes('href')).toContain('linkedin.com');
+    });
+
+    it('WhatsApp click uses openExternalUrl with wa.me URL', async () => {
+      const w = mountModal();
+      await w.findAll('.social-btn')[0].trigger('click');
+      expect(mockOpenExternal).toHaveBeenCalledTimes(1);
+      expect(mockOpenExternal.mock.calls[0][0]).toContain('wa.me');
+    });
+
+    it('LinkedIn click uses openExternalUrl with linkedin URL', async () => {
+      const w = mountModal();
+      await w.findAll('.social-btn')[1].trigger('click');
+      expect(mockOpenExternal).toHaveBeenCalledTimes(1);
+      expect(mockOpenExternal.mock.calls[0][0]).toContain('linkedin.com');
     });
   });
 

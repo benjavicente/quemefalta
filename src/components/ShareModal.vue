@@ -12,13 +12,20 @@ defineEmits<{
   close: [];
 }>();
 
-const { share, copyOnly, whatsappLink, linkedinLink, emailLink, isNativeShareAvailable } =
-  useShare();
+const {
+  share,
+  copyOnly,
+  whatsappLink,
+  linkedinLink,
+  emailLink,
+  isNativeShareAvailable,
+  openExternalUrl,
+} = useShare();
 
 const justCopied = ref(false);
 
 const url = computed(() => {
-  return `${window.location.origin}/u/${props.profile.username}`;
+  return `${globalThis.location.origin}/u/${props.profile.username}`;
 });
 
 const shareText = computed(() => {
@@ -46,7 +53,7 @@ async function handleNativeShare() {
 }
 
 function viewPublic() {
-  window.open(url.value, '_blank');
+  globalThis.open(url.value, '_blank');
 }
 </script>
 
@@ -91,11 +98,21 @@ function viewPublic() {
 
       <!-- Social grid -->
       <div class="share-grid">
-        <a :href="whatsappLink(shareText, url)" target="_blank" rel="noopener" class="social-btn">
+        <a
+          :href="whatsappLink(shareText, url)"
+          rel="noopener noreferrer"
+          class="social-btn"
+          @click.prevent="openExternalUrl(whatsappLink(shareText, url))"
+        >
           <div class="social-icon" style="background: var(--mint)" />
           <span>WhatsApp</span>
         </a>
-        <a :href="linkedinLink(url)" target="_blank" rel="noopener" class="social-btn">
+        <a
+          :href="linkedinLink(url)"
+          rel="noopener noreferrer"
+          class="social-btn"
+          @click.prevent="openExternalUrl(linkedinLink(url))"
+        >
           <div class="social-icon" style="background: var(--pitch)" />
           <span>LinkedIn</span>
         </a>

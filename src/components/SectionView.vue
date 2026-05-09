@@ -161,7 +161,9 @@ onUnmounted(() => cleanupPaint());
     <header class="sect-head">
       <div>
         <div class="sect-name">
-          <span v-if="sectionHeadIcon" class="sect-flag" aria-hidden="true">{{ sectionHeadIcon }}</span>
+          <span v-if="sectionHeadIcon" class="sect-flag" aria-hidden="true">{{
+            sectionHeadIcon
+          }}</span>
           {{ section.name }}
         </div>
         <div class="sect-meta">{{ section.code }}1—{{ section.code }}{{ section.count }}</div>
