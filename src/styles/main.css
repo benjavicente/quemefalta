@@ -66,3 +66,22 @@ body {
 button {
   font-family: inherit;
 }
+
+/*
+ * iOS Safari zooms the viewport when focusing inputs with font-size < 16px.
+ * Force 16px on narrow viewports only so desktop layouts stay compact.
+ * Do not set maximum-scale / user-scalable=no — pinch-zoom must remain available.
+ */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']):not(
+      [type='submit']
+    ):not([type='button']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  body {
+    touch-action: manipulation;
+  }
+}

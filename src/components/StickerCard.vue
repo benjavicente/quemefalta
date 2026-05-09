@@ -207,6 +207,12 @@ function onPointerCancel() {
   object-fit: cover;
   display: block;
   transition: filter 0.2s ease;
+  /* iOS: evita preview/callout al mantener pulsada la foto (Safari lo trata como imagen) */
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
 }
 .stk-img-dim {
   filter: grayscale(85%) brightness(0.42) contrast(0.95);
