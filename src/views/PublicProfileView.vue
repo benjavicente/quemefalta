@@ -107,13 +107,32 @@ function goToMyAlbum() {
   <div class="public-wrap">
     <!-- LOADING -->
     <div v-if="loading" class="loading-state">
-      <div class="loading-mark">★</div>
+      <div class="loading-mark">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="var(--gold)" stroke="none">
+          <polygon
+            points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+          />
+        </svg>
+      </div>
       <div>Cargando perfil...</div>
     </div>
 
     <!-- NOT FOUND -->
     <div v-else-if="notFound" class="not-found">
-      <div class="nf-mark">🤷</div>
+      <div class="nf-mark">
+        <svg
+          width="64"
+          height="64"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--chalk-dim)"
+          stroke-width="1.5"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </div>
       <h1>Perfil no encontrado</h1>
       <p>
         No existe un perfil con el username <strong>@{{ username }}</strong
@@ -127,7 +146,20 @@ function goToMyAlbum() {
 
     <!-- PROFILE CARD -->
     <div v-else-if="profile" class="card">
-      <div class="card-star">★</div>
+      <div class="card-star">
+        <svg
+          width="180"
+          height="180"
+          viewBox="0 0 24 24"
+          fill="var(--gold)"
+          stroke="none"
+          opacity="0.15"
+        >
+          <polygon
+            points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+          />
+        </svg>
+      </div>
 
       <!-- Avatar -->
       <div class="hero">
@@ -184,7 +216,21 @@ function goToMyAlbum() {
       </div>
 
       <div class="footer">
-        <a href="/" class="brand"><span>★</span> QueMeFalta</a>
+        <a href="/" class="brand">
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="var(--gold)"
+            stroke="none"
+            style="vertical-align: middle; margin-right: 4px"
+          >
+            <polygon
+              points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+            />
+          </svg>
+          QueMeFalta
+        </a>
       </div>
     </div>
   </div>

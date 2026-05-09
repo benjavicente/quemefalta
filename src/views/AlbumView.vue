@@ -6,10 +6,9 @@ import { useStickers } from '@/composables/useStickers';
 import { useMeta } from '@/composables/useMeta';
 import { ALBUM_SECTIONS, TOTAL_STICKERS, sectionForSticker, codeForSticker } from '@/lib/albumData';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
-import SectionView from '@/components/SectionView.vue';
 import StickerDetailModal from '@/components/StickerDetailModal.vue';
 import ShareModal from '@/components/ShareModal.vue';
-import GroupPicker from '@/components/GroupPicker.vue';
+import AlbumAccordion from '@/components/AlbumAccordion.vue';
 import BatchInput from '@/components/BatchInput.vue';
 import StickerScanner from '@/components/StickerScanner.vue';
 import UndoToast from '@/components/UndoToast.vue';
@@ -46,6 +45,7 @@ watch(activeSection, (id) => {
   router.replace({ hash: `#${id}` });
 });
 const reloadPage = () => location.reload();
+const accordionRef = ref<InstanceType<typeof AlbumAccordion> | null>(null);
 const detailFor = ref<number | null>(null);
 const shareOpen = ref(false);
 const showBatchInput = ref(false);
@@ -59,22 +59,17 @@ const undoToast = ref({ visible: false, message: '', action: null as (() => void
 // Onboarding guide
 const showOnboarding = ref(false);
 
-// Auto-collapse completed sections: tracks which sections are manually expanded by the user
-const manuallyExpanded = ref<Set<string>>(new Set());
-
-function toggleCompletedSection(sectionId: string) {
-  const s = new Set(manuallyExpanded.value);
-  if (s.has(sectionId)) s.delete(sectionId);
-  else s.add(sectionId);
-  manuallyExpanded.value = s;
-}
-
 // Long-press onboarding
 const showLongPressTip = ref(false);
 const hasSeenLongPressTip = ref(false);
 
 onMounted(() => {
   hasSeenLongPressTip.value = localStorage.getItem('qmf-longpress-tip') === '1';
+
+  // Open accordion section from URL hash (e.g. #team-mex)
+  if (initialSection && initialSection !== ALBUM_SECTIONS[0].id) {
+    setTimeout(() => accordionRef.value?.openSection(initialSection), 100);
+  }
 });
 
 // Show onboarding when loaded, authenticated, and truly new user (0 stickers)
@@ -114,10 +109,6 @@ function toggleMissingCollapse(sectionId: string) {
 const detailSectionName = computed(() => {
   if (detailFor.value === null) return '';
   return sectionForSticker(detailFor.value)?.name ?? '';
-});
-
-const currentSection = computed(() => {
-  return ALBUM_SECTIONS.find((s) => s.id === activeSection.value) ?? ALBUM_SECTIONS[0];
 });
 
 const albumMeta = computed(() => ({
@@ -240,8 +231,9 @@ const progressBarColor = computed(() => {
 });
 
 function jumpToSection(sectionId: string) {
-  activeSection.value = sectionId;
   view.value = 'album';
+  // Wait for the accordion to render, then open the section
+  setTimeout(() => accordionRef.value?.openSection(sectionId), 50);
 }
 
 function selectFirstMatch() {
@@ -358,7 +350,12 @@ const userInitial = computed(() => {
         </div>
       </div>
       <div class="hdr-actions">
-        <button class="hdr-icon-btn" title="Compartir mi perfil" @click="shareOpen = true">
+        <button
+          class="hdr-icon-btn"
+          title="Compartir mi perfil"
+          aria-label="Compartir mi perfil"
+          @click="shareOpen = true"
+        >
           <svg
             width="14"
             height="14"
@@ -374,7 +371,12 @@ const userInitial = computed(() => {
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
           </svg>
         </button>
-        <button class="hdr-icon-btn" title="Tutorial de uso" @click="showOnboarding = true">
+        <button
+          class="hdr-icon-btn"
+          title="Tutorial de uso"
+          aria-label="Tutorial de uso"
+          @click="showOnboarding = true"
+        >
           <svg
             width="14"
             height="14"
@@ -390,7 +392,11 @@ const userInitial = computed(() => {
         </button>
         <!-- Profile button with dropdown -->
         <div class="profile-wrap" @click.stop>
-          <button class="hdr-profile-btn" @click="showProfileMenu = !showProfileMenu">
+          <button
+            class="hdr-profile-btn"
+            aria-label="Menú de perfil"
+            @click="showProfileMenu = !showProfileMenu"
+          >
             <div v-if="profile?.avatar_url" class="hdr-avatar">
               <img :src="profile.avatar_url" :alt="profile.display_name ?? ''" />
             </div>
@@ -409,8 +415,23 @@ const userInitial = computed(() => {
 
     <!-- SESSION DEAD POPUP -->
     <div v-if="sessionDead" class="dead-bg">
-      <div class="dead-modal">
-        <div class="dead-icon">⚠</div>
+      <div class="dead-modal" role="alert">
+        <div class="dead-icon">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--coral)"
+            stroke-width="2"
+          >
+            <path
+              d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </div>
         <div class="dead-title">SESIÓN EXPIRADA</div>
         <p class="dead-text">
           Tus últimos cambios no se guardaron. Recarga la página para reconectar con el servidor.
@@ -420,13 +441,34 @@ const userInitial = computed(() => {
     </div>
 
     <!-- SYNC ERROR (non-fatal) -->
-    <div v-if="syncError && !sessionDead" class="sync-error">
-      ⚠ Error guardando: {{ syncError }}
+    <div v-if="syncError && !sessionDead" class="sync-error" role="alert">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        style="flex-shrink: 0"
+      >
+        <path
+          d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+        />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+      Error guardando: {{ syncError }}
     </div>
 
     <!-- LOADING -->
     <div v-if="loading && !loaded" class="loading-state">
-      <div class="loading-mark">★</div>
+      <div class="loading-mark">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="var(--gold)" stroke="none">
+          <polygon
+            points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+          />
+        </svg>
+      </div>
       <div>Cargando tu álbum...</div>
     </div>
 
@@ -455,7 +497,14 @@ const userInitial = computed(() => {
           </div>
         </div>
         <!-- Visual progress bar -->
-        <div class="progress-bar">
+        <div
+          class="progress-bar"
+          role="progressbar"
+          :aria-valuenow="stats.pct"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-label="`Progreso del álbum: ${stats.pct}%`"
+        >
           <div
             class="progress-bar-fill"
             :style="{ width: `${stats.pct}%`, background: progressBarColor }"
@@ -516,26 +565,21 @@ const userInitial = computed(() => {
             v-model="sectionSearch"
             class="sec-search"
             type="text"
+            aria-label="Buscar sección"
             placeholder="Buscar sección... (ej: México, Argentina)"
             autocomplete="off"
             @keydown.enter="selectFirstMatch"
           />
         </div>
-        <!-- Group picker (replaces old chip strip) -->
-        <GroupPicker
-          v-if="!sectionSearch"
-          :active-section="activeSection"
-          @select="(id) => (activeSection = id)"
-        />
-        <!-- Filtered chips fallback when searching -->
-        <div v-else class="sec-picker">
+        <!-- Search results -->
+        <div v-if="sectionSearch" class="sec-picker">
           <button
             v-for="sec in filteredSections"
             :key="sec.id"
-            :class="['sec-chip', { on: activeSection === sec.id, done: sec.complete }]"
+            :class="['sec-chip', { done: sec.complete }]"
             @click="
-              activeSection = sec.id;
               sectionSearch = '';
+              accordionRef?.openSection(sec.id);
             "
           >
             <div class="sec-chip-top">
@@ -551,39 +595,13 @@ const userInitial = computed(() => {
             </div>
           </button>
         </div>
-        <!-- Auto-collapse completed section or show full grid -->
-        <div
-          v-if="
-            sectionsWithCounts.find((s) => s.id === currentSection.id)?.complete &&
-            !manuallyExpanded.has(currentSection.id)
-          "
-          class="collapsed-section"
-          @click="toggleCompletedSection(currentSection.id)"
-        >
-          <div class="collapsed-left">
-            <span class="collapsed-name">{{ currentSection.name }}</span>
-          </div>
-          <div class="collapsed-right">
-            <span class="collapsed-badge">Completa</span>
-            <span class="collapsed-count"
-              >{{ currentSection.count }}/{{ currentSection.count }}</span
-            >
-            <span class="collapsed-chevron">&#9656;</span>
-          </div>
-        </div>
-        <template v-else>
-          <SectionView :section="currentSection" @open-detail="handleSectionOpenDetail" />
-          <button
-            v-if="
-              sectionsWithCounts.find((s) => s.id === currentSection.id)?.complete &&
-              manuallyExpanded.has(currentSection.id)
-            "
-            class="collapse-back-btn"
-            @click="toggleCompletedSection(currentSection.id)"
-          >
-            Colapsar seccion
-          </button>
-        </template>
+        <!-- Accordion (groups → teams → sticker grids inline) -->
+        <AlbumAccordion
+          v-show="!sectionSearch"
+          ref="accordionRef"
+          @open-detail="handleSectionOpenDetail"
+          @section-change="(id) => router.replace({ hash: `#${id}` })"
+        />
       </template>
 
       <!-- MISSING VIEW with filters -->
@@ -597,7 +615,18 @@ const userInitial = computed(() => {
               </p>
             </div>
             <button v-if="stats.missing > 0" class="copy-btn" @click="copyMissing">
-              📋 Copiar
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              Copiar
             </button>
           </div>
 
@@ -619,7 +648,23 @@ const userInitial = computed(() => {
           </div>
 
           <div v-if="stats.missing === 0" class="empty">
-            <div class="empty-mark">🏆</div>
+            <div class="empty-mark">
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--gold)"
+                stroke-width="1.5"
+              >
+                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                <path d="M4 22h16" />
+                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+              </svg>
+            </div>
             <div class="empty-title">¡ÁLBUM COMPLETO!</div>
             <div class="empty-sub">Vamos a celebrar.</div>
           </div>
@@ -699,7 +744,20 @@ const userInitial = computed(() => {
                 <div class="dupe-num">{{ codeForSticker(d.num) }}</div>
                 <div class="dupe-info">
                   <div class="dupe-section">{{ d.section }}</div>
-                  <div v-if="d.note" class="dupe-note">✎ {{ d.note }}</div>
+                  <div v-if="d.note" class="dupe-note">
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      style="flex-shrink: 0"
+                    >
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    {{ d.note }}
+                  </div>
                 </div>
               </div>
               <div class="dupe-count">×{{ d.count + 1 }}</div>
@@ -975,6 +1033,9 @@ const userInitial = computed(() => {
   color: #ff8a80;
   font-family: var(--mono);
   font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   text-align: center;
 }
 
