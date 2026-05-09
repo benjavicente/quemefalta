@@ -55,7 +55,7 @@ test.describe('Share Flow', () => {
     await page.click('.hdr-icon-btn[title="Compartir mi perfil"]');
 
     const socialBtns = page.locator('.social-btn');
-    await expect(socialBtns.nth(0)).toHaveAttribute('href', /wa\.me/);
+    await expect(socialBtns.nth(0)).toHaveAttribute('href', /api\.whatsapp\.com/);
     await expect(socialBtns.nth(1)).toHaveAttribute('href', /linkedin\.com/);
     await expect(socialBtns.nth(2)).toHaveAttribute('href', /^mailto:/);
   });

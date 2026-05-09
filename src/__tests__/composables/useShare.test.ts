@@ -95,12 +95,12 @@ describe('useShare', () => {
   });
 
   describe('URL builders', () => {
-    it('whatsappLink builds correct wa.me URL', () => {
+    it('whatsappLink builds api.whatsapp.com URL with encoded text', () => {
       const { whatsappLink } = useShare();
-      const url = whatsappLink('Check this', 'https://example.com');
+      const built = whatsappLink('Check this', 'https://example.com');
 
-      expect(url).toContain('https://wa.me/?text=');
-      expect(url).toContain(encodeURIComponent('Check this\nhttps://example.com'));
+      expect(built).toContain('https://api.whatsapp.com/send?text=');
+      expect(built).toContain(encodeURIComponent('Check this\nhttps://example.com'));
     });
 
     it('linkedinLink builds correct LinkedIn sharing URL', () => {

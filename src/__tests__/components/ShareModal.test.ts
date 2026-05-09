@@ -15,7 +15,7 @@ vi.mock('@/composables/useShare', () => ({
     share: mockShare,
     copyOnly: mockCopyOnly,
     whatsappLink: (text: string, url: string) =>
-      `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`,
+      `https://api.whatsapp.com/send?text=${encodeURIComponent(`${text}\n${url}`)}`,
     linkedinLink: (url: string) =>
       `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
     emailLink: (subject: string, body: string) =>
@@ -62,7 +62,7 @@ describe('ShareModal', () => {
     it('WhatsApp link has correct href', () => {
       const w = mountModal();
       const whatsappLink = w.findAll('.social-btn')[0];
-      expect(whatsappLink.attributes('href')).toContain('wa.me');
+      expect(whatsappLink.attributes('href')).toContain('api.whatsapp.com');
     });
 
     it('LinkedIn link has correct href', () => {
@@ -71,11 +71,11 @@ describe('ShareModal', () => {
       expect(linkedinLink.attributes('href')).toContain('linkedin.com');
     });
 
-    it('WhatsApp click uses openExternalUrl with wa.me URL', async () => {
+    it('WhatsApp click uses openExternalUrl with api.whatsapp.com URL', async () => {
       const w = mountModal();
       await w.findAll('.social-btn')[0].trigger('click');
       expect(mockOpenExternal).toHaveBeenCalledTimes(1);
-      expect(mockOpenExternal.mock.calls[0][0]).toContain('wa.me');
+      expect(mockOpenExternal.mock.calls[0][0]).toContain('api.whatsapp.com');
     });
 
     it('LinkedIn click uses openExternalUrl with linkedin URL', async () => {

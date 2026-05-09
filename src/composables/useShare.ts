@@ -54,9 +54,10 @@ export function useShare() {
     }
   }
 
+  /** Prefilled message without phone — api.whatsapp.com/send is more reliable than wa.me/?text= on iOS. */
   function whatsappLink(text: string, url: string): string {
-    const msg = encodeURIComponent(`${text}\n${url}`);
-    return `https://wa.me/?text=${msg}`;
+    const message = `${text}\n${url}`;
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
   }
 
   function linkedinLink(url: string): string {

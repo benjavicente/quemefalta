@@ -52,6 +52,24 @@ async function handleNativeShare() {
   });
 }
 
+/** LinkedIn web share always hits login; native share sheet lets users pick the LinkedIn app on mobile. */
+async function openLinkedInShare() {
+  const webUrl = linkedinLink(url.value);
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    try {
+      await navigator.share({
+        title: shareTitle.value,
+        text: `${shareText.value}\n${url.value}`,
+        url: url.value,
+      });
+      return;
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+    }
+  }
+  openExternalUrl(webUrl);
+}
+
 function viewPublic() {
   globalThis.open(url.value, '_blank');
 }
@@ -111,7 +129,7 @@ function viewPublic() {
           :href="linkedinLink(url)"
           rel="noopener noreferrer"
           class="social-btn"
-          @click.prevent="openExternalUrl(linkedinLink(url))"
+          @click.prevent="openLinkedInShare()"
         >
           <div class="social-icon" style="background: var(--pitch)" />
           <span>LinkedIn</span>
