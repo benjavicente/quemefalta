@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
 
 * {
   box-sizing: border-box;
@@ -33,16 +33,16 @@
   --line: rgba(255, 255, 255, 0.08);
   --line-soft: rgba(255, 255, 255, 0.04);
   --chalk: #f0ece4;
-  --chalk-dim: rgba(240, 236, 228, 0.55);
+  --chalk-dim: rgba(240, 236, 228, 0.65);
 
   /* Shadows */
   --shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
   --shadow-glow-gold: 0 0 12px rgba(240, 180, 41, 0.3);
   --shadow-glow-mint: 0 0 12px rgba(77, 208, 161, 0.35);
 
-  /* Typography */
-  --display: 'Bebas Neue', sans-serif;
-  --body: 'Archivo', sans-serif;
+  /* Typography — Barlow: athletic, energetic, great for sports apps */
+  --display: 'Barlow Condensed', sans-serif;
+  --body: 'Barlow', sans-serif;
   --mono: 'JetBrains Mono', monospace;
 }
 
@@ -50,7 +50,8 @@ html,
 body,
 #app {
   height: 100%;
-  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: 100vh; /* fallback for older browsers */
 }
 
 body {
@@ -65,6 +66,30 @@ body {
 
 button {
   font-family: inherit;
+  cursor: pointer;
+}
+
+/* Accessibility: visible focus for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Prevent accidental pull-to-refresh on mobile */
+body {
+  overscroll-behavior: contain;
 }
 
 /*
