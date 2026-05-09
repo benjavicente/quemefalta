@@ -24,13 +24,22 @@ const showClearConfirm = ref(false);
 
 const sectionHeadIcon = computed(() => teamFlagEmoji(props.section.code));
 
+const isTeamSection = computed(() => !!props.section.isTeam);
+
 const items = computed(() => {
   return Array.from({ length: props.section.count }, (_, i) => {
     const num = props.section.startsAt + i;
+    const indexInSection = i + 1; // 1-based
+    let variant: 'normal' | 'crest' | 'squad' = 'normal';
+    if (isTeamSection.value) {
+      if (indexInSection === 1) variant = 'crest';
+      else if (indexInSection === 13) variant = 'squad';
+    }
     return {
       number: num,
-      code: `${props.section.code}${i + 1}`,
+      code: `${props.section.code}${indexInSection}`,
       state: getSticker(num),
+      variant,
     };
   });
 });
@@ -175,12 +184,14 @@ onUnmounted(() => cleanupPaint());
         v-for="item in items"
         :key="item.number"
         :data-stk="item.number"
+        :class="{ 'sect-grid-squad': item.variant === 'squad' }"
         @pointerdown="onPaintStart(item.number, $event)"
       >
         <StickerCard
           :number="item.number"
           :code="item.code"
           :state="item.state"
+          :variant="item.variant"
           :anim-delay="(paintOrder.get(item.number) ?? 0) * 40"
           @cycle="cycleSticker(item.number)"
           @open-detail="emit('openDetail', item.number)"
@@ -207,6 +218,7 @@ onUnmounted(() => cleanupPaint());
           v-if="hasAny"
           class="clear-btn"
           :title="`Quitar las ${ownedCount} pegadas de ${section.name}`"
+          :aria-label="`Quitar las ${ownedCount} pegadas de ${section.name}`"
           @click="askClearSection"
         >
           <svg
@@ -298,6 +310,9 @@ onUnmounted(() => cleanupPaint());
   .sect-grid {
     grid-template-columns: repeat(5, 1fr);
   }
+}
+.sect-grid-squad {
+  grid-column: span 2;
 }
 .sect-actions {
   margin-top: 16px;

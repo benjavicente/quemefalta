@@ -2,11 +2,14 @@
 import { computed, ref, watch } from 'vue';
 import type { StickerState } from '@/composables/useStickers';
 import ballImg from '@/assets/ball-stadium.png';
+import crestImg from '@/assets/ball-crest.jpg';
+import squadImg from '@/assets/field-squad.jpg';
 
 const props = defineProps<{
   number: number;
   code: string;
   state: StickerState;
+  variant?: 'normal' | 'crest' | 'squad';
   animDelay?: number;
 }>();
 
@@ -17,6 +20,13 @@ const emit = defineEmits<{
 
 const owned = computed(() => props.state.owned);
 const dupes = computed(() => props.state.dupes);
+const isCrest = computed(() => props.variant === 'crest');
+const isSquad = computed(() => props.variant === 'squad');
+const cardImg = computed(() => {
+  if (isCrest.value) return crestImg;
+  if (isSquad.value) return squadImg;
+  return ballImg;
+});
 
 // Micro-animation: pop when becoming owned
 const justMarked = ref(false);
@@ -90,21 +100,36 @@ function onPointerCancel() {
   <div class="stk-wrap">
     <div
       class="stk"
-      :class="{ 'stk-owned': owned, 'stk-dupe': dupes > 0, 'stk-just-marked': justMarked }"
+      :class="{
+        'stk-owned': owned,
+        'stk-dupe': dupes > 0,
+        'stk-just-marked': justMarked,
+        'stk-crest': isCrest,
+        'stk-squad': isSquad,
+      }"
       @pointerdown.prevent="onPointerDown"
       @pointerup="onPointerUp"
       @pointercancel="onPointerCancel"
       @pointerleave="onPointerCancel"
       @contextmenu.prevent
     >
+      <!-- Variant label -->
+      <div v-if="isCrest" class="stk-variant-label stk-variant-crest">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" />
+        </svg>
+        ESCUDO
+      </div>
+      <div v-if="isSquad" class="stk-variant-label stk-variant-squad">SELECCIÓN</div>
       <!-- Art well -->
       <div class="stk-art" :class="{ 'stk-art-owned': owned }">
         <img
-          :src="ballImg"
+          :src="cardImg"
           alt=""
           class="stk-img"
           :class="{ 'stk-img-dim': !owned }"
           draggable="false"
+          loading="lazy"
         />
         <div v-if="!owned" class="stk-img-veil" />
         <div class="stk-code-overlay" :class="{ 'stk-code-overlay-owned': owned }">{{ code }}</div>
@@ -112,6 +137,19 @@ function onPointerCancel() {
       <!-- Footer band -->
       <div class="stk-footer" :class="{ 'stk-footer-owned': owned }">
         <span class="stk-num" :class="{ 'stk-num-owned': owned }">{{ code }}</span>
+      </div>
+      <!-- Owned check (not color-only) -->
+      <div v-if="owned && dupes === 0" class="stk-check">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#0a3d2e"
+          stroke-width="3"
+        >
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
       </div>
       <!-- Badges -->
       <div v-if="dupes > 0" class="stk-badge" :class="{ 'stk-badge-bounce': badgeBounce }">
@@ -267,6 +305,22 @@ function onPointerCancel() {
   color: var(--pitch-deep);
 }
 
+/* Owned check mark */
+.stk-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  background: var(--gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+
 /* Badges */
 .stk-badge {
   position: absolute;
@@ -291,6 +345,56 @@ function onPointerCancel() {
   background: var(--pitch-deep);
   border-radius: 50%;
   z-index: 2;
+}
+
+/* Variant: Crest (sticker 1) */
+.stk-crest {
+  border: 1.5px solid var(--gold-deep);
+  box-shadow: 0 0 0 1px rgba(240, 180, 41, 0.15);
+}
+.stk-crest.stk-owned {
+  box-shadow:
+    0 0 12px rgba(240, 180, 41, 0.25),
+    0 8px 24px rgba(232, 179, 65, 0.18);
+}
+
+/* Variant: Squad photo (sticker 13) — wider aspect */
+.stk-squad {
+  aspect-ratio: 2 / 1.2;
+}
+
+/* Variant labels */
+.stk-variant-label {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-family: var(--mono);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 2px 5px;
+  border-radius: 3px;
+  z-index: 3;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.stk-variant-crest {
+  background: rgba(240, 180, 41, 0.25);
+  color: var(--gold);
+}
+.stk-crest.stk-owned .stk-variant-crest {
+  background: rgba(10, 61, 46, 0.4);
+  color: var(--pitch-deep);
+}
+.stk-variant-squad {
+  background: rgba(77, 208, 161, 0.2);
+  color: var(--mint);
+}
+.stk-squad.stk-owned .stk-variant-squad {
+  background: rgba(10, 61, 46, 0.4);
+  color: var(--pitch-deep);
 }
 
 /* Micro-animations */
