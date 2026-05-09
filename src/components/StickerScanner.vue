@@ -10,6 +10,166 @@ const emit = defineEmits<{
 
 // Valid section codes for matching
 const validCodes = new Set(ALBUM_SECTIONS.map((s) => s.code));
+const validCodesArray = ALBUM_SECTIONS.map((s) => s.code);
+
+// ── Fuzzy matching helpers ──
+
+/** Levenshtein distance between two strings */
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+/** Find closest valid section code within maxDist (default 1) */
+function fuzzyMatchCode(raw: string, maxDist = 1): string | null {
+  // Exact match first
+  if (validCodes.has(raw)) return raw;
+
+  // Too short for fuzzy — all album codes are 3 chars, need at least 2 for exact
+  if (raw.length < 3) return null;
+
+  let best: string | null = null;
+  let bestDist = maxDist + 1;
+
+  for (const code of validCodesArray) {
+    // Only compare codes of similar length (±1 char)
+    if (Math.abs(code.length - raw.length) > maxDist) continue;
+    const d = levenshtein(raw, code);
+    if (d < bestDist) {
+      bestDist = d;
+      best = code;
+    }
+  }
+  return best;
+}
+
+// ── Common OCR character substitutions ──
+const OCR_CHAR_FIXES: Record<string, string> = {
+  '0': 'O',
+
+  '1': 'I',
+
+  '5': 'S',
+  '8': 'B',
+  '{': '(',
+  '}': ')',
+  '[': '(',
+  ']': ')',
+};
+
+function fixOcrChars(s: string): string {
+  // In the letter portion, replace digits that look like letters
+  return s.replace(/[015{}\[\]8]/g, (ch) => OCR_CHAR_FIXES[ch] ?? ch);
+}
+
+// ── Image preprocessing ──
+
+/** Preprocess canvas for better OCR: grayscale → contrast → binarize → scale 2x */
+function preprocessImage(srcCanvas: HTMLCanvasElement): HTMLCanvasElement {
+  const w = srcCanvas.width;
+  const h = srcCanvas.height;
+  const srcCtx = srcCanvas.getContext('2d');
+  if (!srcCtx) return srcCanvas;
+
+  const srcData = srcCtx.getImageData(0, 0, w, h);
+  const pixels = srcData.data;
+
+  // Step 1: Convert to grayscale
+  const gray = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const r = pixels[i * 4];
+    const g = pixels[i * 4 + 1];
+    const b = pixels[i * 4 + 2];
+    gray[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+  }
+
+  // Step 2: Contrast stretch (histogram equalization lite)
+  let min = 255;
+  let max = 0;
+  for (let i = 0; i < gray.length; i++) {
+    if (gray[i] < min) min = gray[i];
+    if (gray[i] > max) max = gray[i];
+  }
+  const range = max - min || 1;
+  for (let i = 0; i < gray.length; i++) {
+    gray[i] = Math.round(((gray[i] - min) / range) * 255);
+  }
+
+  // Step 3: Adaptive threshold (Otsu's method)
+  const histogram = new Uint32Array(256);
+  for (let i = 0; i < gray.length; i++) histogram[gray[i]]++;
+  const total = gray.length;
+  let sumAll = 0;
+  for (let i = 0; i < 256; i++) sumAll += i * histogram[i];
+  let sumBg = 0;
+  let wBg = 0;
+  let maxVariance = 0;
+  let threshold = 128;
+  for (let t = 0; t < 256; t++) {
+    wBg += histogram[t];
+    if (wBg === 0) continue;
+    const wFg = total - wBg;
+    if (wFg === 0) break;
+    sumBg += t * histogram[t];
+    const meanBg = sumBg / wBg;
+    const meanFg = (sumAll - sumBg) / wFg;
+    const variance = wBg * wFg * (meanBg - meanFg) * (meanBg - meanFg);
+    if (variance > maxVariance) {
+      maxVariance = variance;
+      threshold = t;
+    }
+  }
+
+  // Apply threshold → black text on white background
+  for (let i = 0; i < gray.length; i++) {
+    gray[i] = gray[i] > threshold ? 255 : 0;
+  }
+
+  // Step 4: Scale 2x for better OCR recognition
+  const scale = 2;
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = w * scale;
+  outCanvas.height = h * scale;
+  const outCtx = outCanvas.getContext('2d');
+  if (!outCtx) return srcCanvas;
+
+  // Write binarized image to a temp canvas first, then scale
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = w;
+  tmpCanvas.height = h;
+  const tmpCtx = tmpCanvas.getContext('2d');
+  if (!tmpCtx) return srcCanvas;
+
+  const outData = tmpCtx.createImageData(w, h);
+  for (let i = 0; i < gray.length; i++) {
+    outData.data[i * 4] = gray[i];
+    outData.data[i * 4 + 1] = gray[i];
+    outData.data[i * 4 + 2] = gray[i];
+    outData.data[i * 4 + 3] = 255;
+  }
+  tmpCtx.putImageData(outData, 0, 0);
+
+  // Scale up with nearest-neighbor (sharp edges)
+  outCtx.imageSmoothingEnabled = false;
+  outCtx.drawImage(tmpCanvas, 0, 0, w * scale, h * scale);
+
+  console.log(
+    `[Scanner] Preprocessed: ${w}x${h} → ${w * scale}x${h * scale}, threshold=${threshold}`,
+  );
+  return outCanvas;
+}
 
 // State
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -29,6 +189,12 @@ interface DetectedCode {
 const detectedCodes = ref<DetectedCode[]>([]);
 const rawOcrText = ref('');
 
+// ── Live preview state ──
+const liveHint = ref('');
+const liveCodesPreview = ref<string[]>([]);
+let liveScanning = false;
+let liveScanTimer: ReturnType<typeof setTimeout> | null = null;
+
 // Start camera
 async function startCamera() {
   error.value = '';
@@ -36,14 +202,15 @@ async function startCamera() {
     const mediaStream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
       },
     });
     stream.value = mediaStream;
     if (videoRef.value) {
       videoRef.value.srcObject = mediaStream;
       await videoRef.value.play();
+      startLivePreview();
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -59,10 +226,85 @@ async function startCamera() {
 
 // Stop camera
 function stopCamera() {
+  stopLivePreview();
   if (stream.value) {
     stream.value.getTracks().forEach((t) => t.stop());
     stream.value = null;
   }
+}
+
+// ── Live preview scanning ──
+// Grabs a low-res frame every ~2.5s and runs OCR to show a hint
+
+function startLivePreview() {
+  if (liveScanning) return;
+  liveScanning = true;
+  liveHint.value = '';
+  liveCodesPreview.value = [];
+  scheduleLiveScan();
+}
+
+function stopLivePreview() {
+  liveScanning = false;
+  if (liveScanTimer) {
+    clearTimeout(liveScanTimer);
+    liveScanTimer = null;
+  }
+}
+
+function scheduleLiveScan() {
+  if (!liveScanning) return;
+  liveScanTimer = setTimeout(() => runLiveScan(), 2500);
+}
+
+async function runLiveScan() {
+  if (!liveScanning || !videoRef.value || !ocrWorker.value || !workerReady.value) {
+    if (liveScanning) scheduleLiveScan();
+    return;
+  }
+
+  try {
+    const video = videoRef.value;
+    // Use small canvas for speed (480px wide)
+    const scale = Math.min(1, 480 / video.videoWidth);
+    const w = Math.round(video.videoWidth * scale);
+    const h = Math.round(video.videoHeight * scale);
+
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = w;
+    tmpCanvas.height = h;
+    const ctx = tmpCanvas.getContext('2d');
+    if (!ctx) {
+      scheduleLiveScan();
+      return;
+    }
+    ctx.drawImage(video, 0, 0, w, h);
+
+    // Preprocess for better OCR
+    const processed = preprocessImage(tmpCanvas);
+    const dataUrl = processed.toDataURL('image/jpeg', 0.8);
+
+    const result = await ocrWorker.value.recognize(dataUrl);
+    if (!liveScanning) return; // stopped while we were waiting
+
+    const text = result.data.text;
+    const codes = extractCodes(text);
+
+    if (codes.length > 0) {
+      liveCodesPreview.value = codes.map((c) => c.code);
+      liveHint.value = '';
+    } else if (text.trim().length < 5) {
+      liveHint.value = 'Apunta al sobre con los códigos';
+      liveCodesPreview.value = [];
+    } else {
+      liveHint.value = 'No se ven códigos — acércate más';
+      liveCodesPreview.value = [];
+    }
+  } catch {
+    // Silently ignore live scan errors
+  }
+
+  if (liveScanning) scheduleLiveScan();
 }
 
 // Initialize OCR worker
@@ -106,37 +348,57 @@ function extractCodes(text: string): DetectedCode[] {
   // Normalize text: uppercase, replace common OCR mistakes
   let cleaned = text.toUpperCase();
   // OCR often reads bullet points as various characters
-  cleaned = cleaned.replace(/[•·°*|]/g, ' ');
+  cleaned = cleaned.replace(/[•·°*|~`#]/g, ' ');
+  // Remove dots/commas between digits (OCR artifact: "1.3" → "13", "1,3" → "13")
+  cleaned = cleaned.replace(/(\d)[.,](\d)/g, '$1$2');
   // Normalize separators
-  cleaned = cleaned.replace(/[-–—]/g, ' ');
+  cleaned = cleaned.replace(/[-–—_:;,./\\]/g, ' ');
   // Remove extra whitespace
   cleaned = cleaned.replace(/\s+/g, ' ');
 
-  // Pattern: team code (2-3 letters) followed by number (1-2 digits)
-  // With optional space, dash, or nothing between them
-  const pattern = /\b([A-Z]{2,4})\s*(\d{1,2})\b/g;
-  let match;
+  // Two-pass extraction:
+  // Pass 1: clean letter prefixes (ALG 16, MEX5, BRA 12)
+  // Pass 2: mixed alphanumeric prefixes where OCR mangled letters into digits (C0L, 8RA)
+  const patterns: RegExp[] = [
+    /([A-Z]{2,4})\s*(\d{1,2})(?=\s|$|[^A-Z0-9])/g, // letters-only prefix
+    /([A-Z0-9]*[0-9][A-Z0-9]*)\s+(\d{1,2})(?=\s|$|[^A-Z0-9])/g, // mixed prefix (space required)
+  ];
 
-  while ((match = pattern.exec(cleaned)) !== null) {
-    const prefix = match[1];
-    const num = match[2];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(cleaned)) !== null) {
+      let rawPrefix = match[1];
+      const num = match[2];
 
-    // Check if prefix is a valid section code
-    if (!validCodes.has(prefix)) continue;
+      // Skip if prefix is all digits (not a code)
+      if (/^\d+$/.test(rawPrefix)) continue;
 
-    const codeStr = `${prefix}${num}`;
-    const stickerNum = stickerNumberFromCode(codeStr);
-    if (stickerNum === undefined) continue;
+      // Fix common OCR char substitutions in the prefix (0→O, 1→I, etc.)
+      rawPrefix = fixOcrChars(rawPrefix);
 
-    // Avoid duplicate entries
-    if (seen.has(codeStr)) continue;
-    seen.add(codeStr);
+      // Try exact match first, then fuzzy
+      const matchedCode = fuzzyMatchCode(rawPrefix);
+      if (!matchedCode) continue;
 
-    results.push({
-      code: codeStr,
-      stickerNumber: stickerNum,
-      selected: true,
-    });
+      const codeStr = `${matchedCode}${num}`;
+      const stickerNum = stickerNumberFromCode(codeStr);
+      if (stickerNum === undefined) continue;
+
+      // Avoid duplicate entries
+      if (seen.has(codeStr)) continue;
+      seen.add(codeStr);
+
+      const wasFuzzy = matchedCode !== rawPrefix;
+      if (wasFuzzy) {
+        console.log(`[Scanner] Fuzzy: "${rawPrefix}" → "${matchedCode}" (code: ${codeStr})`);
+      }
+
+      results.push({
+        code: codeStr,
+        stickerNumber: stickerNum,
+        selected: true,
+      });
+    }
   }
 
   return results;
@@ -162,7 +424,9 @@ async function processImage() {
 
   try {
     console.log('[Scanner] Processing image...');
-    const dataUrl = canvasRef.value.toDataURL('image/png');
+    // Preprocess: grayscale → contrast → binarize → 2x scale
+    const processed = preprocessImage(canvasRef.value);
+    const dataUrl = processed.toDataURL('image/png');
     const result = await ocrWorker.value.recognize(dataUrl);
     rawOcrText.value = result.data.text;
     console.log('[Scanner] OCR raw text:', result.data.text);
@@ -236,7 +500,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="sc-bg" @click="emit('close')">
+  <div class="sc-bg" @click="emit('close')" @keydown.escape="emit('close')">
     <div class="sc" @click.stop>
       <!-- Header -->
       <div class="sc-head">
@@ -244,7 +508,19 @@ onBeforeUnmount(() => {
           <div class="sc-label">ESCANEAR SOBRE</div>
           <div class="sc-title">Lector de laminas</div>
         </div>
-        <button class="sc-close" @click="emit('close')">&#10005;</button>
+        <button class="sc-close" aria-label="Cerrar" @click="emit('close')">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
 
       <!-- Camera phase -->
@@ -263,7 +539,16 @@ onBeforeUnmount(() => {
         </div>
         <canvas ref="canvasRef" style="display: none" />
 
-        <div v-if="error" class="sc-error">{{ error }}</div>
+        <div v-if="error" class="sc-error" role="alert">{{ error }}</div>
+
+        <!-- Live preview hint -->
+        <div v-if="liveCodesPreview.length > 0" class="sc-live sc-live-found">
+          <span class="sc-live-icon">&#9679;</span>
+          Veo: <strong>{{ liveCodesPreview.join(', ') }}</strong>
+        </div>
+        <div v-else-if="liveHint" class="sc-live sc-live-empty">
+          {{ liveHint }}
+        </div>
 
         <div class="sc-footer">
           <div class="sc-worker-status">
@@ -299,7 +584,21 @@ onBeforeUnmount(() => {
       <!-- No results phase -->
       <template v-if="phase === 'no-results'">
         <div class="sc-no-results">
-          <div class="sc-no-icon">🤷</div>
+          <div class="sc-no-icon">
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--coral)"
+              stroke-width="1.5"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="8" y1="15" x2="16" y2="15" />
+              <line x1="9" y1="9" x2="9.01" y2="9" />
+              <line x1="15" y1="9" x2="15.01" y2="9" />
+            </svg>
+          </div>
           <div class="sc-no-title">No se detectaron láminas</div>
           <p class="sc-no-text">
             No se encontraron códigos válidos en la imagen. Prueba con mejor iluminación, más cerca
@@ -340,7 +639,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div v-if="error" class="sc-error">{{ error }}</div>
+        <div v-if="error" class="sc-error" role="alert">{{ error }}</div>
 
         <div class="sc-footer sc-footer-results">
           <button class="sc-btn sc-btn-retry" @click="retry">Reintentar</button>
@@ -576,6 +875,37 @@ onBeforeUnmount(() => {
   color: var(--coral);
   margin: 8px 0;
   line-height: 1.4;
+}
+
+/* Live preview */
+.sc-live {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+}
+.sc-live-found {
+  background: rgba(95, 194, 138, 0.1);
+  border: 1px solid rgba(95, 194, 138, 0.3);
+  color: var(--mint);
+}
+.sc-live-found strong {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.sc-live-icon {
+  font-size: 8px;
+  margin-right: 4px;
+  animation: scPulse 1s ease-in-out infinite;
+}
+.sc-live-empty {
+  background: rgba(246, 241, 225, 0.04);
+  border: 1px solid rgba(246, 241, 225, 0.1);
+  color: rgba(246, 241, 225, 0.5);
 }
 
 /* Footer */

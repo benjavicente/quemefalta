@@ -76,7 +76,7 @@ function viewPublic() {
 </script>
 
 <template>
-  <div class="modal-bg" @click="$emit('close')">
+  <div class="modal-bg" @click="$emit('close')" @keydown.escape="$emit('close')">
     <div class="modal" @click.stop>
       <div class="modal-title">COMPARTIR MI ÁLBUM</div>
       <p class="modal-desc">

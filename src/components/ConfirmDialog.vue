@@ -14,7 +14,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="cd-bg" @click="emit('cancel')">
+  <div class="cd-bg" @click="emit('cancel')" @keydown.escape="emit('cancel')">
     <div class="cd" @click.stop>
       <div class="cd-title">{{ title }}</div>
       <p class="cd-msg">{{ message }}</p>

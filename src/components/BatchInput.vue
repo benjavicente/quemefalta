@@ -145,14 +145,26 @@ function handleAdd() {
 </script>
 
 <template>
-  <div class="bi-bg" @click="emit('close')">
+  <div class="bi-bg" @click="emit('close')" @keydown.escape="emit('close')">
     <div class="bi" @click.stop>
       <div class="bi-head">
         <div>
           <div class="bi-label">AGREGAR LÁMINAS</div>
           <div class="bi-title">Ingreso rápido</div>
         </div>
-        <button class="bi-close" @click="emit('close')">✕</button>
+        <button class="bi-close" aria-label="Cerrar" @click="emit('close')">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
       <p class="bi-hint">
         Escribe códigos separados por coma. Usa <strong>MEX</strong> para agregar todo México,
@@ -174,13 +186,14 @@ function handleAdd() {
       <textarea
         v-model="input"
         class="bi-input"
+        aria-label="Códigos de láminas"
         placeholder="Ej: MEX5, ARG1, BRA&#10;o por equipo: MEX 1 5 8 12"
         rows="3"
         autofocus
         @keydown.enter.ctrl="handleAdd"
         @keydown.enter.meta="handleAdd"
       />
-      <div v-if="error" class="bi-error">{{ error }}</div>
+      <div v-if="error" class="bi-error" role="alert">{{ error }}</div>
       <div class="bi-footer">
         <div class="bi-preview">
           {{ parseSummary(input).unique }} láminas<template v-if="parseSummary(input).dupes > 0">

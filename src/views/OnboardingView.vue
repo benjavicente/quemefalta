@@ -64,12 +64,13 @@ async function submit() {
         v-model="username"
         class="input"
         type="text"
+        aria-label="Nombre de usuario"
         placeholder="ej: tony"
         autocapitalize="off"
         autocorrect="off"
         @keydown.enter="submit"
       />
-      <div v-if="error" class="error">{{ error }}</div>
+      <div v-if="error" class="error" role="alert">{{ error }}</div>
       <button class="btn-solid" :disabled="saving" @click="submit">
         {{ saving ? 'GUARDANDO...' : 'CONTINUAR' }}
       </button>
