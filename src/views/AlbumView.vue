@@ -765,10 +765,11 @@ const userInitial = computed(() => {
 
 <style scoped>
 .app {
-  padding-bottom: 60px;
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
   max-width: 640px;
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 @media (min-width: 700px) {
   .app {
@@ -782,7 +783,10 @@ const userInitial = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px clamp(14px, 3vw, 28px) 14px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-right: calc(clamp(14px, 3vw, 28px) + env(safe-area-inset-right, 0px));
+  padding-bottom: 14px;
+  padding-left: calc(clamp(14px, 3vw, 28px) + env(safe-area-inset-left, 0px));
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;

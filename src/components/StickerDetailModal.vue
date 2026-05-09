@@ -189,12 +189,16 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
   background: #141c2b;
   border: 1px solid var(--line);
   border-radius: 12px 12px 0 0;
-  padding: 20px 18px 28px;
+  padding: 20px 18px calc(28px + env(safe-area-inset-bottom, 0px));
   width: 100%;
   max-width: 480px;
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
   animation: slideUp 0.2s ease-out;
   color: var(--chalk);
+  /* Evita que un long-press seleccione títulos/botones como texto (iOS) */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 @keyframes fadeIn {
   from {
@@ -437,6 +441,8 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
   line-height: 1.45;
   resize: none;
   outline: none;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .note-textarea:focus {
   border-color: var(--gold);
