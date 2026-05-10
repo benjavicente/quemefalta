@@ -30,10 +30,12 @@ async function loadStickers(userId: string, force = false) {
   loading.value = true;
   syncError.value = null;
 
-  const { data, error } = await supabase
-    .from('stickers')
-    .select('sticker_number, owned, dupes, note')
-    .eq('user_id', userId);
+  // Ensure session is fresh before reading
+  await ensureFreshSession();
+
+  const { data, error } = await withAuthRetry(() =>
+    supabase.from('stickers').select('sticker_number, owned, dupes, note').eq('user_id', userId),
+  );
 
   if (error) {
     console.error('[useStickers] Load error:', error);
@@ -43,7 +45,11 @@ async function loadStickers(userId: string, force = false) {
   }
 
   const map: Record<number, StickerState> = {};
-  for (const row of data ?? []) {
+  const rows =
+    (data as
+      | { sticker_number: number; owned: boolean; dupes: number; note: string | null }[]
+      | null) ?? [];
+  for (const row of rows) {
     map[row.sticker_number] = {
       owned: row.owned,
       dupes: row.dupes ?? 0,

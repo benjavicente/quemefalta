@@ -33,51 +33,69 @@ const _sessionDead = ref(false);
 export const sessionDead = readonly(_sessionDead);
 
 // === KEEP-ALIVE & VISIBILITY REFRESH (skip in mock mode) ===
-if (!useMock) {
-  setInterval(
-    async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        const { error } = await supabase.auth.refreshSession();
-        if (!error) _sessionDead.value = false;
-      }
-    },
-    45 * 60 * 1000,
-  );
+let lastRefreshAt = Date.now();
+let lastActivityAt = Date.now();
+const REFRESH_INTERVAL = 10 * 60 * 1000; // Refresh every 10 min (JWT expires in 60 min on free tier)
+const STALE_THRESHOLD = 3 * 60 * 1000; // Consider stale after 3 min idle
 
-  document.addEventListener('visibilitychange', async () => {
+async function refreshSession(): Promise<boolean> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      console.warn('[Supabase] No session found during refresh');
+      _sessionDead.value = true;
+      return false;
+    }
+    const { error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.warn('[Supabase] Refresh failed:', error.message);
+      // One more attempt — get session again to check if it's truly dead
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        _sessionDead.value = true;
+        return false;
+      }
+      // Session exists but refresh failed — may still be valid
+      return true;
+    }
+    lastRefreshAt = Date.now();
+    _sessionDead.value = false;
+    console.log('[Supabase] Session refreshed');
+    return true;
+  } catch {
+    console.warn('[Supabase] Refresh threw');
+    _sessionDead.value = true;
+    return false;
+  }
+}
+
+if (!useMock) {
+  // Proactive refresh every 10 min
+  setInterval(() => refreshSession(), REFRESH_INTERVAL);
+
+  // Refresh when tab becomes visible (user returns after idle)
+  document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        const { error } = await supabase.auth.refreshSession();
-        if (!error) _sessionDead.value = false;
+      const elapsed = Date.now() - lastRefreshAt;
+      // Only refresh if it's been > 2 min since last refresh
+      if (elapsed > 2 * 60 * 1000) {
+        refreshSession();
       }
     }
   });
 }
 
 // === Pre-write: refrescar si lleva rato idle ===
-let lastActivityAt = Date.now();
-const STALE_THRESHOLD = 5 * 60 * 1000;
-
 export async function ensureFreshSession(): Promise<boolean> {
+  if (useMock) return true;
   if (_sessionDead.value) return false;
 
   const now = Date.now();
-  if (now - lastActivityAt > STALE_THRESHOLD) {
-    const { error } = await supabase.auth.refreshSession();
-    if (error) {
-      // Ultimo intento
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        _sessionDead.value = true;
-        return false;
-      }
-    }
+  if (now - lastActivityAt > STALE_THRESHOLD || now - lastRefreshAt > REFRESH_INTERVAL) {
+    const ok = await refreshSession();
+    if (!ok) return false;
   }
   lastActivityAt = now;
   return true;
