@@ -44,9 +44,9 @@ const recommendation = computed(() => {
   const cpn = sim.value.costPerNewReal;
   if (cpn === Infinity) return { level: 'neutral', text: 'Album completo' };
   const ratio = cpn / mlPrice.value;
-  if (ratio < 0.5) return { level: 'green', text: `Conviene comprar y cambiar ($${cpn} vs $${mlPrice.value})` };
-  if (ratio < 1.0) return { level: 'yellow', text: `Conviene si efectivamente cambias ($${cpn} vs $${mlPrice.value})` };
-  return { level: 'red', text: `Conviene comprar individuales ($${cpn} > $${mlPrice.value})` };
+  if (ratio < 0.5) return { level: 'green', text: `Sobres + cambio sale ${formatCLP(cpn)}/nueva — mas barato que ML (${formatCLP(mlPrice.value)})` };
+  if (ratio < 1.0) return { level: 'yellow', text: `Casi igual: ${formatCLP(cpn)}/nueva vs ${formatCLP(mlPrice.value)} en ML` };
+  return { level: 'red', text: `Mejor comprar en ML: sobre sale ${formatCLP(cpn)}/nueva vs ${formatCLP(mlPrice.value)} individual` };
 });
 
 // Table (without trade, raw projection)
@@ -145,28 +145,31 @@ function formatCLP(n: number): string {
 
       <div class="calc-results">
         <div class="calc-result">
-          <span class="calc-result-val">{{ sim.newDirect }}</span> nuevas por sobres
-          <template v-if="sim.newFromTrade > 0">
-            + <span class="calc-result-val calc-result-trade">{{ sim.newFromTrade }}</span> por cambio
-          </template>
+          <span class="calc-result-val">{{ sim.newDirect }}</span> nuevas salen de los sobres
+        </div>
+        <div v-if="sim.newFromTrade > 0" class="calc-result">
+          <span class="calc-result-val calc-result-trade">+{{ sim.newFromTrade }}</span>
+          nuevas cambiando repetidas <span class="calc-result-hint">(sin costo extra)</span>
         </div>
         <div class="calc-result">
           Llegaras a <span class="calc-result-val">{{ sim.totalFinal }}</span>
           <span class="calc-result-pct">({{ sim.pctFinal }}%)</span>
         </div>
+
+        <div class="calc-divider" />
+
         <div class="calc-result">
-          Costo total: <span class="calc-result-val">{{ formatCLP(sim.totalCost) }}</span>
+          Gastas <span class="calc-result-val">{{ formatCLP(sim.totalCost) }}</span> en sobres
         </div>
-        <div class="calc-results-costs">
-          <div class="calc-result">
-            Sin cambio: <span class="calc-result-val">{{ formatCLP(sim.costPerNewNaive) }}</span>/nueva
-          </div>
-          <div v-if="tauDecimal > 0" class="calc-result">
-            Con cambio: <span class="calc-result-val calc-result-trade">{{ formatCLP(sim.costPerNewReal) }}</span>/nueva
-          </div>
+        <div class="calc-result">
+          Cada lamina nueva te sale
+          <span class="calc-result-val">{{ formatCLP(tauDecimal > 0 ? sim.costPerNewReal : sim.costPerNewNaive) }}</span>
+          <template v-if="tauDecimal > 0">
+            <span class="calc-result-hint">(seria {{ formatCLP(sim.costPerNewNaive) }} sin cambiar repes)</span>
+          </template>
         </div>
         <div v-if="sim.dupesDead > 0" class="calc-result calc-result-dead">
-          {{ sim.dupesDead }} repetidas sin cambiar
+          {{ sim.dupesDead }} repetidas quedarian sin cambiar
         </div>
       </div>
 
@@ -409,9 +412,14 @@ function formatCLP(n: number): string {
 .calc-result-pct {
   color: rgba(246, 241, 225, 0.5);
 }
-.calc-results-costs {
-  display: flex;
-  gap: 16px;
+.calc-result-hint {
+  font-size: 11px;
+  color: rgba(246, 241, 225, 0.35);
+}
+.calc-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 6px 0;
 }
 .calc-result-dead {
   font-family: var(--mono);
