@@ -7,10 +7,32 @@
 | `npm run dev` | Dev server con Supabase real (necesita `.env.local`) |
 | `npm run dev:mock` | Dev server con mock local (datos en `mock-data.json`) |
 | `npm run build` | Build producción (`vue-tsc` + `vite build`) |
-| `npm run test:run` | Unit tests (vitest, 300+ tests) |
-| `npm run test:e2e` | E2E tests (playwright) |
+| `npm run test:run` | Unit tests (vitest, ~400 tests) |
+| `npm run test:e2e` | E2E tests (playwright, 29 tests) |
 | `npm run lint` | ESLint fix |
 | `npm run format` | Prettier |
+
+### Tests
+
+**Unit tests (vitest)**
+```bash
+npm run test:run          # Correr todos una vez
+npx vitest                # Watch mode (re-corre al guardar)
+npx vitest run --coverage # Con reporte de cobertura
+npx vitest run src/__tests__/composables/useStickers.test.ts  # Un archivo específico
+npx vitest run -t "cycleSticker"  # Un test por nombre
+```
+
+**E2E tests (playwright)**
+```bash
+npm run test:e2e                                      # Todos (paralelo, ~12s)
+npx playwright test --workers=1                       # Secuencial (debug)
+npx playwright test tests/e2e/error-resilience.spec.ts  # Un archivo
+npx playwright test -g "500 on sticker"               # Por nombre
+npx playwright test --ui                              # UI interactivo
+npx playwright test --debug                           # Step-by-step debugger
+```
+> **Nota**: Los E2E corren en puerto 5174 para no chocar con `dev:mock` en 5173. Usan el Supabase client real con interceptación de rutas (no mock mode).
 
 ## Arquitectura
 
