@@ -483,4 +483,260 @@ describe('useStickers', () => {
       expect(sd.value).toBe(false);
     });
   });
+
+  describe('addBatch()', () => {
+    it('marks new stickers as owned', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { stickers, addBatch, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      const count = await addBatch([1, 5, 10]);
+
+      expect(count).toBe(3);
+      expect(stickers.value[1]?.owned).toBe(true);
+      expect(stickers.value[5]?.owned).toBe(true);
+      expect(stickers.value[10]?.owned).toBe(true);
+    });
+
+    it('treats duplicate numbers as extra dupes', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { stickers, addBatch, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      await addBatch([1, 1, 1]); // 3 copies → owned + 2 dupes
+
+      expect(stickers.value[1]?.owned).toBe(true);
+      expect(stickers.value[1]?.dupes).toBe(2);
+    });
+
+    it('adds extra dupes to already owned stickers', async () => {
+      setQueryResult({
+        data: [createStickerDbRow(5, { owned: true, dupes: 1, note: null })],
+        error: null,
+      });
+
+      const { stickers, addBatch, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      await addBatch([5, 5]); // 2 copies of already-owned → +1 dupe
+
+      expect(stickers.value[5]?.dupes).toBe(2); // was 1, +1
+    });
+
+    it('skips already owned stickers with single count', async () => {
+      setQueryResult({
+        data: [createStickerDbRow(5, { owned: true, dupes: 0, note: null })],
+        error: null,
+      });
+
+      const { addBatch, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      const count = await addBatch([5]); // already owned, count=1 → no-op
+
+      expect(count).toBe(0);
+    });
+
+    it('filters out invalid sticker numbers', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { stickers, addBatch, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      const count = await addBatch([0, -1, 981, 5]);
+
+      expect(count).toBe(1);
+      expect(stickers.value[5]?.owned).toBe(true);
+      expect(stickers.value[0]).toBeUndefined();
+    });
+
+    it('reverts on error', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { stickers, addBatch, loaded, syncError } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: { message: 'Batch failed' } });
+      await addBatch([1, 2, 3]);
+
+      expect(syncError.value).toBe('Batch failed');
+      expect(stickers.value[1]).toBeUndefined();
+      expect(stickers.value[2]).toBeUndefined();
+    });
+
+    it('returns 0 for empty input', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { addBatch, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      const count = await addBatch([]);
+      expect(count).toBe(0);
+    });
+
+    it('blocks when session is expired', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { addBatch, loaded, syncError } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      mockSupabase.ensureFreshSession.mockResolvedValueOnce(false);
+      await addBatch([1, 2]);
+
+      expect(syncError.value).toBe('Sesión expirada. Recarga la página.');
+    });
+  });
+
+  describe('decrementSticker()', () => {
+    it('decrements dupes when dupes > 0', async () => {
+      setQueryResult({
+        data: [createStickerDbRow(10, { owned: true, dupes: 2, note: null })],
+        error: null,
+      });
+
+      const { stickers, decrementSticker, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      decrementSticker(10);
+      await flushPromises();
+
+      expect(stickers.value[10]?.dupes).toBe(1);
+    });
+
+    it('removes sticker when dupes = 0', async () => {
+      setQueryResult({
+        data: [createStickerDbRow(10, { owned: true, dupes: 0, note: null })],
+        error: null,
+      });
+
+      const { stickers, decrementSticker, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      decrementSticker(10);
+      await flushPromises();
+
+      expect(stickers.value[10]).toBeUndefined();
+    });
+
+    it('is a no-op for unowned sticker', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { stickers, decrementSticker, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      decrementSticker(10);
+      expect(stickers.value[10]).toBeUndefined();
+    });
+  });
+
+  describe('importBulk()', () => {
+    it('merge mode: adds new stickers and updates quantities', async () => {
+      setQueryResult({
+        data: [createStickerDbRow(1, { owned: true, dupes: 0, note: 'keep me' })],
+        error: null,
+      });
+
+      const { stickers, importBulk, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      const data = new Map([
+        [1, 3], // owned, change from 1 to 3 (dupes: 2)
+        [5, 1], // new sticker
+      ]);
+      const changed = await importBulk(data, 'merge');
+
+      expect(changed).toBe(2);
+      expect(stickers.value[1]?.dupes).toBe(2);
+      expect(stickers.value[1]?.note).toBe('keep me'); // note preserved in merge
+      expect(stickers.value[5]?.owned).toBe(true);
+    });
+
+    it('replace mode: wipes stickers not in CSV', async () => {
+      setQueryResult({
+        data: [
+          createStickerDbRow(1, { owned: true, dupes: 0, note: null }),
+          createStickerDbRow(5, { owned: true, dupes: 1, note: null }),
+        ],
+        error: null,
+      });
+
+      const { stickers, importBulk, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      const data = new Map([[1, 1]]); // only keep sticker 1
+      const changed = await importBulk(data, 'replace');
+
+      expect(changed).toBe(1); // sticker 5 deleted
+      expect(stickers.value[1]?.owned).toBe(true);
+      expect(stickers.value[5]).toBeUndefined();
+    });
+
+    it('returns 0 when no changes needed', async () => {
+      setQueryResult({
+        data: [createStickerDbRow(1, { owned: true, dupes: 0, note: null })],
+        error: null,
+      });
+
+      const { importBulk, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      const data = new Map([[1, 1]]); // same as current
+      const changed = await importBulk(data, 'merge');
+
+      expect(changed).toBe(0);
+    });
+
+    it('reverts on upsert error', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { stickers, importBulk, loaded, syncError } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: { message: 'Import failed' } });
+      const data = new Map([[1, 1], [2, 2]]);
+      await importBulk(data, 'merge');
+
+      expect(syncError.value).toBe('Import failed');
+      expect(stickers.value[1]).toBeUndefined();
+    });
+
+    it('blocks when session is expired', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { importBulk, loaded, syncError } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      mockSupabase.ensureFreshSession.mockResolvedValueOnce(false);
+      const data = new Map([[1, 1]]);
+      const changed = await importBulk(data, 'merge');
+
+      expect(changed).toBe(0);
+      expect(syncError.value).toBe('Sesión expirada. Recarga la página.');
+    });
+
+    it('filters out-of-range sticker numbers', async () => {
+      setQueryResult({ data: [], error: null });
+
+      const { importBulk, loaded } = useStickers();
+      await vi.waitFor(() => expect(loaded.value).toBe(true));
+
+      setQueryResult({ data: null, error: null });
+      const data = new Map([[0, 1], [981, 1], [5, 1]]);
+      const changed = await importBulk(data, 'merge');
+
+      expect(changed).toBe(1); // only sticker 5
+    });
+  });
 });
