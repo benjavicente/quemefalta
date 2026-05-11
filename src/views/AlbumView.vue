@@ -276,6 +276,27 @@ function copyMissing() {
     );
   }
   const text = lines.join('\n');
+  copyToClipboard(text);
+}
+
+function copyDupes() {
+  const lines: string[] = [`Tengo ${stats.value.dupes} láminas repetidas para canjear:`];
+  // Group dupes by section
+  const bySection = new Map<string, { code: string; count: number }[]>();
+  for (const d of dupesList.value) {
+    if (!bySection.has(d.section)) bySection.set(d.section, []);
+    bySection.get(d.section)!.push({ code: codeForSticker(d.num), count: d.count + 1 });
+  }
+  for (const [section, items] of bySection) {
+    lines.push(
+      `\n${section}: ${items.map((i) => `${i.code} (×${i.count})`).join(', ')}`,
+    );
+  }
+  const text = lines.join('\n');
+  copyToClipboard(text);
+}
+
+function copyToClipboard(text: string) {
   navigator.clipboard?.writeText(text).then(
     () => {
       undoToast.value = { visible: true, message: '¡Lista copiada al portapapeles!', action: null };
@@ -743,6 +764,20 @@ const userInitial = computed(() => {
               <h2>TIENES {{ stats.dupes }} REPETIDAS</h2>
               <p>Listas para canjear. Toca una para editar cantidad o notas.</p>
             </div>
+            <button v-if="dupesList.length > 0" class="copy-btn" @click="copyDupes">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              Copiar
+            </button>
           </div>
           <div v-if="dupesList.length === 0" class="empty empty-dupes">
             <div class="empty-stack">
