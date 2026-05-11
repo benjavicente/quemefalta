@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { setupSupabaseRoutes, injectSession } from './fixtures/handlers';
-import { TEST_PROFILE, TEST_PROFILE_NOT_ONBOARDED } from './fixtures/data';
+import { TEST_PROFILE } from './fixtures/data';
 
 test.describe('Auth Flow', () => {
   test('redirects unauthenticated user from /album to /auth', async ({ page }) => {
