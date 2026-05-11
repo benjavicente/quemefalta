@@ -59,8 +59,9 @@ jobs:
 
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      # Env vars must match SUPABASE_URL in tests/e2e/fixtures/data.ts so route interception works
       - run: npm run build
-      - run: npx playwright test --reporter=list
         env:
-          VITE_SUPABASE_URL: http://localhost:0
-          VITE_SUPABASE_ANON_KEY: mock
+          VITE_SUPABASE_URL: https://zxtnogvmpjgqfoegajgu.supabase.co
+          VITE_SUPABASE_ANON_KEY: fake-anon-key-for-e2e
+      - run: npx playwright test --reporter=list

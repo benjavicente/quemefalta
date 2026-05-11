@@ -11,6 +11,13 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     mockReset: true,
     restoreMocks: true,
+    coverage: {
+      provider: 'v8',
+      thresholds: {
+        statements: 75,
+        functions: 70,
+      },
+    },
   },
   resolve: {
     alias: {
