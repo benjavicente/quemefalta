@@ -7,6 +7,7 @@ import { useUndo } from '@/composables/useUndo';
 import type { StickerState } from '@/composables/useStickers';
 import type { AlbumSection } from '@/lib/albumData';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
+import { FWC_CODE, getFwcVariant, FWC_VERTICAL_RANGE } from '@/lib/fwcConfig';
 
 const props = defineProps<{
   section: AlbumSection;
@@ -25,15 +26,18 @@ const showClearConfirm = ref(false);
 const sectionHeadIcon = computed(() => teamFlagEmoji(props.section.code));
 
 const isTeamSection = computed(() => !!props.section.isTeam);
+const isFwcSection = computed(() => props.section.code === FWC_CODE);
 
 const items = computed(() => {
   return Array.from({ length: props.section.count }, (_, i) => {
     const num = props.section.startsAt + i;
     const indexInSection = i + 1; // 1-based
-    let variant: 'normal' | 'crest' | 'squad' = 'normal';
+    let variant: 'normal' | 'crest' | 'squad' | 'fwc-h' | 'fwc-v' = 'normal';
     if (isTeamSection.value) {
       if (indexInSection === 1) variant = 'crest';
       else if (indexInSection === 13) variant = 'squad';
+    } else if (isFwcSection.value) {
+      variant = getFwcVariant(indexInSection);
     }
     return {
       number: num,
@@ -42,6 +46,22 @@ const items = computed(() => {
       variant,
     };
   });
+});
+
+/** FWC: split into 3 groups so h/v never share a CSS grid */
+const fwcGroups = computed(() => {
+  if (!isFwcSection.value) return null;
+  const all = items.value;
+  const vStart = FWC_VERTICAL_RANGE[0] - 1; // 0-based: index 3 (FWC4)
+  const vEnd = FWC_VERTICAL_RANGE[1]; // 0-based exclusive: index 8
+  // Group 1: FWC1-2 (pure horizontal)
+  // Group 2: FWC3-8 (FWC3 horizontal + FWC4-8 vertical, flex mixed)
+  // Group 3: FWC9-20 (pure horizontal)
+  return [
+    { key: 'h1', css: 'sect-fwc-h-group', items: all.slice(0, vStart - 1) },
+    { key: 'mid', css: 'sect-fwc-mid', items: all.slice(vStart - 1, vEnd) },
+    { key: 'h2', css: 'sect-fwc-h-group', items: all.slice(vEnd) },
+  ].filter((g) => g.items.length > 0);
 });
 
 const ownedCount = computed(() => {
@@ -179,7 +199,33 @@ onUnmounted(() => cleanupPaint());
       </div>
       <div class="sect-badge">{{ ownedCount }}/{{ section.count }}</div>
     </header>
-    <div class="sect-grid">
+    <!-- FWC: three flex groups (h1, mixed, h2) -->
+    <template v-if="fwcGroups">
+      <div v-for="group in fwcGroups" :key="group.key" :class="['sect-grid', group.css]">
+        <div
+          v-for="item in group.items"
+          :key="item.number"
+          :data-stk="item.number"
+          :class="{
+            'sect-fwc-mid-h': group.key === 'mid' && item.variant === 'fwc-h',
+            'sect-fwc-mid-v': group.key === 'mid' && item.variant === 'fwc-v',
+          }"
+          @pointerdown="onPaintStart(item.number, $event)"
+        >
+          <StickerCard
+            :number="item.number"
+            :code="item.code"
+            :state="item.state"
+            :variant="item.variant"
+            :anim-delay="(paintOrder.get(item.number) ?? 0) * 40"
+            @cycle="cycleSticker(item.number)"
+            @open-detail="emit('openDetail', item.number)"
+          />
+        </div>
+      </div>
+    </template>
+    <!-- Non-FWC: single grid -->
+    <div v-else class="sect-grid">
       <div
         v-for="item in items"
         :key="item.number"
@@ -313,6 +359,47 @@ onUnmounted(() => cleanupPaint());
 }
 .sect-grid-squad {
   grid-column: span 2;
+}
+
+/* FWC horizontal groups: flex, 2 per row, centered orphans */
+.sect-fwc-h-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+.sect-fwc-h-group > * {
+  width: calc((100% - 10px) / 2);
+}
+
+/* FWC mixed group (FWC3 horizontal + FWC4-8 vertical): flex, centered */
+.sect-fwc-mid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+.sect-fwc-mid-h {
+  width: 100%;
+}
+.sect-fwc-mid-v {
+  width: calc((100% - 20px) / 3);
+}
+@media (min-width: 480px) {
+  .sect-fwc-mid-h {
+    width: calc((100% - 10px) / 2);
+  }
+  .sect-fwc-mid-v {
+    width: calc((100% - 30px) / 4);
+  }
+}
+@media (min-width: 580px) {
+  .sect-fwc-mid-h {
+    width: 100%;
+  }
+  .sect-fwc-mid-v {
+    width: calc((100% - 40px) / 5);
+  }
 }
 .sect-actions {
   margin-top: 16px;

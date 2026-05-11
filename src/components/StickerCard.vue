@@ -4,12 +4,13 @@ import type { StickerState } from '@/composables/useStickers';
 import ballImg from '@/assets/ball-stadium.png';
 import crestImg from '@/assets/ball-crest.jpg';
 import squadImg from '@/assets/field-squad.jpg';
+import { FWC_HORIZONTAL_IMG, FWC_VERTICAL_IMG } from '@/lib/fwcConfig';
 
 const props = defineProps<{
   number: number;
   code: string;
   state: StickerState;
-  variant?: 'normal' | 'crest' | 'squad';
+  variant?: 'normal' | 'crest' | 'squad' | 'fwc-h' | 'fwc-v';
   animDelay?: number;
 }>();
 
@@ -22,7 +23,11 @@ const owned = computed(() => props.state.owned);
 const dupes = computed(() => props.state.dupes);
 const isCrest = computed(() => props.variant === 'crest');
 const isSquad = computed(() => props.variant === 'squad');
+const isFwcH = computed(() => props.variant === 'fwc-h');
+const isFwcV = computed(() => props.variant === 'fwc-v');
 const cardImg = computed(() => {
+  if (isFwcH.value) return FWC_HORIZONTAL_IMG;
+  if (isFwcV.value) return FWC_VERTICAL_IMG;
   if (isCrest.value) return crestImg;
   if (isSquad.value) return squadImg;
   return ballImg;
@@ -106,6 +111,8 @@ function onPointerCancel() {
         'stk-just-marked': justMarked,
         'stk-crest': isCrest,
         'stk-squad': isSquad,
+        'stk-fwc-h': isFwcH,
+        'stk-fwc-v': isFwcV,
       }"
       @pointerdown.prevent="onPointerDown"
       @pointerup="onPointerUp"
@@ -360,6 +367,11 @@ function onPointerCancel() {
 
 /* Variant: Squad photo (sticker 13) — wider aspect */
 .stk-squad {
+  aspect-ratio: 2 / 1.2;
+}
+
+/* Variant: FWC horizontal — landscape, aspect controlled by grid span */
+.stk-fwc-h {
   aspect-ratio: 2 / 1.2;
 }
 
