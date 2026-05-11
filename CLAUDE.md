@@ -55,6 +55,7 @@ AlbumView.vue ─── Vista principal, orquesta todo
 │           └── variant: normal (resto, ball-stadium.png)
 ├── MissingView.vue ← Tab "Faltan" con filtros, agrupado, copiar
 ├── DupesView.vue ← Tab "Repetidas" con copiar
+├── CalculadoraView.vue ← Tab "Calculadora" de sobres con modelo de cambio
 ├── StickerDetailModal.vue ← Editar cantidad, notas, quitar
 ├── BatchInput.vue ← Ingreso masivo por código (MEX5, ARG 1 5 8)
 ├── StickerScanner.vue ← OCR con cámara (tesseract.js + fuzzy matching)
@@ -104,6 +105,8 @@ OnboardingView.vue ← Elegir username
 | `src/lib/ocrUtils.ts` | Fuzzy matching, OCR char fixes, `extractCodes()` — lógica pura, sin DOM |
 | `src/lib/canvasUtils.ts` | `preprocessImage()` — grayscale, Otsu binarize, scale 2x para OCR |
 | `src/lib/fwcConfig.ts` | Config de layout FWC intro (variantes h/v, imágenes por sticker) |
+| `src/lib/calcUtils.ts` | Calculadora de sobres: expectedNew, simulateWithTrade, projectionTable, projectionCurves |
+| `src/lib/csvUtils.ts` | Export/import CSV grilla 49×20: generateCsv, parseCsv |
 | `src/lib/mockClient.ts` | Mock Supabase para `dev:mock` (query builder chainable, auth fake, persistence JSON) |
 
 ## Composables
@@ -128,6 +131,7 @@ OnboardingView.vue ← Elegir username
 - **CSS**: Variables custom (`--gold`, `--pitch`, `--chalk`, `--coral`, `--mint`, etc.) definidas en `main.css`.
 - **Mobile**: `touch-action: manipulation`, `100dvh`, `overscroll-behavior: contain`, `prefers-reduced-motion`.
 - **Archivos pequeños**: Al agregar features nuevas, extraer lógica a archivos separados (composables, lib utils, componentes) en vez de inflar los existentes. Target: ningún archivo supera ~500 líneas.
+- **Post-feature**: Al terminar una feature, revisar si CLAUDE.md necesita actualización (mapa de componentes, archivos de datos, convenciones, deuda técnica).
 
 ## Archivos eliminados (no reimportar)
 
