@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import SectionView from '@/components/SectionView.vue';
 import { ALBUM_SECTIONS } from '@/lib/albumData';
+import { barColor } from '@/lib/progressColors';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import { useStickers } from '@/composables/useStickers';
 
@@ -88,13 +89,6 @@ function openSection(sectionId: string) {
     expandedGroup.value = sec.group;
     expandedTeam.value = sectionId;
   }
-}
-
-function barColor(pct: number, complete: boolean): string {
-  if (complete) return '#34d399';
-  if (pct >= 90) return 'var(--mint)';
-  if (pct >= 50) return 'var(--gold)';
-  return 'var(--coral)';
 }
 
 defineExpose({ openSection });

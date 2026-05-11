@@ -5,6 +5,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useStickers } from '@/composables/useStickers';
 import { useMeta } from '@/composables/useMeta';
 import { ALBUM_SECTIONS, TOTAL_STICKERS, sectionForSticker, codeForSticker } from '@/lib/albumData';
+import { pctColor } from '@/lib/progressColors';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import StickerDetailModal from '@/components/StickerDetailModal.vue';
 import ShareModal from '@/components/ShareModal.vue';
@@ -245,13 +246,6 @@ const almostCompleteSections = computed(() => {
 });
 
 // Progress bar color
-function pctColor(pct: number): string {
-  if (pct >= 100) return '#34d399';
-  if (pct >= 90) return 'var(--mint)';
-  if (pct >= 50) return 'var(--gold)';
-  return 'var(--coral)';
-}
-
 const progressBarColor = computed(() => pctColor(stats.value.pct));
 
 function jumpToSection(sectionId: string) {
