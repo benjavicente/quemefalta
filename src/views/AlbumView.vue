@@ -33,19 +33,28 @@ const {
 const route = useRoute();
 const router = useRouter();
 
-// Leer seccion activa del hash de la URL
+// Leer estado inicial del hash de la URL
+const rawHash = route.hash.replace('#', '');
+const initialView: 'album' | 'missing' | 'dupes' =
+  rawHash === 'missing' ? 'missing' : rawHash === 'dupes' ? 'dupes' : 'album';
 const initialSection =
-  ALBUM_SECTIONS.find((s) => s.id === route.hash.replace('#', ''))?.id ?? ALBUM_SECTIONS[0].id;
+  ALBUM_SECTIONS.find((s) => s.id === rawHash)?.id ?? ALBUM_SECTIONS[0].id;
 
 const activeSection = ref(initialSection);
-const view = ref<'album' | 'missing' | 'dupes'>('album');
+const view = ref(initialView);
 
-// Sync hash → URL cuando cambia la seccion
-watch(activeSection, (id) => {
-  router.replace({ hash: `#${id}` });
-});
+function setView(v: 'album' | 'missing' | 'dupes') {
+  view.value = v;
+  if (v === 'album') {
+    // Keep current section hash or clear
+    router.replace({ hash: '' });
+  } else {
+    router.replace({ hash: `#${v}` });
+  }
+}
 const reloadPage = () => location.reload();
 const accordionRef = ref<InstanceType<typeof AlbumAccordion> | null>(null);
+const progressRef = ref<HTMLElement | null>(null);
 const detailFor = ref<number | null>(null);
 const shareOpen = ref(false);
 const showBatchInput = ref(false);
@@ -66,9 +75,23 @@ const hasSeenLongPressTip = ref(false);
 onMounted(() => {
   hasSeenLongPressTip.value = localStorage.getItem('qmf-longpress-tip') === '1';
 
-  // Open accordion section from URL hash (e.g. #team-mex)
-  if (initialSection && initialSection !== ALBUM_SECTIONS[0].id) {
-    setTimeout(() => accordionRef.value?.openSection(initialSection), 100);
+  // Restore state from URL hash
+  if (rawHash) {
+    setTimeout(() => {
+      if (initialView === 'album' && initialSection !== ALBUM_SECTIONS[0].id) {
+        accordionRef.value?.openSection(initialSection);
+        // Scroll to the opened team row
+        setTimeout(() => {
+          const openTeam = document.querySelector('.acc-team.on');
+          if (openTeam) {
+            openTeam.scrollIntoView({ behavior: 'instant', block: 'start' });
+          }
+        }, 50);
+      } else if (initialView !== 'album') {
+        // Missing/dupes — scroll to just above the tabs
+        progressRef.value?.scrollIntoView({ behavior: 'instant', block: 'start' });
+      }
+    }, 150);
   }
 });
 
@@ -222,16 +245,18 @@ const almostCompleteSections = computed(() => {
 });
 
 // Progress bar color
-const progressBarColor = computed(() => {
-  const pct = stats.value.pct;
-  if (pct >= 75) return 'var(--gold)';
-  if (pct >= 50) return 'var(--mint)';
-  if (pct >= 25) return 'var(--gold)';
+function pctColor(pct: number): string {
+  if (pct >= 100) return '#34d399';
+  if (pct >= 90) return 'var(--mint)';
+  if (pct >= 50) return 'var(--gold)';
   return 'var(--coral)';
-});
+}
+
+const progressBarColor = computed(() => pctColor(stats.value.pct));
 
 function jumpToSection(sectionId: string) {
   view.value = 'album';
+  router.replace({ hash: `#${sectionId}` });
   // Wait for the accordion to render, then open the section
   setTimeout(() => accordionRef.value?.openSection(sectionId), 50);
 }
@@ -474,7 +499,7 @@ const userInitial = computed(() => {
 
     <template v-else>
       <!-- PROGRESS HERO with bar -->
-      <section class="progress">
+      <section ref="progressRef" class="progress">
         <div class="progress-row">
           <div>
             <div class="progress-pct-row">
@@ -514,11 +539,11 @@ const userInitial = computed(() => {
 
       <!-- TABS with preview hints -->
       <nav class="tabs">
-        <button :class="['tab', { on: view === 'album' }]" @click="view = 'album'">Álbum</button>
-        <button :class="['tab', { on: view === 'missing' }]" @click="view = 'missing'">
+        <button :class="['tab', { on: view === 'album' }]" @click="setView('album')">Álbum</button>
+        <button :class="['tab', { on: view === 'missing' }]" @click="setView('missing')">
           Faltan {{ stats.missing }}
         </button>
-        <button :class="['tab', { on: view === 'dupes' }]" @click="view = 'dupes'">
+        <button :class="['tab', { on: view === 'dupes' }]" @click="setView('dupes')">
           Repetidas {{ stats.dupes }}
         </button>
         <!-- Scan button -->
@@ -673,6 +698,7 @@ const userInitial = computed(() => {
               <div
                 class="list-group-head"
                 style="cursor: pointer"
+                :style="{ borderLeftColor: pctColor(group.pctOwned) }"
                 @click="toggleMissingCollapse(group.section.id)"
               >
                 <div class="list-group-head-left">
@@ -685,10 +711,10 @@ const userInitial = computed(() => {
                   <span class="list-group-title"
                     >{{ group.section.name }} ({{ group.items.length }})</span
                   >
-                  <span v-if="group.pctOwned >= 80" class="almost-badge">¡Casi!</span>
+                  <span v-if="group.pctOwned >= 90" class="almost-badge">¡Casi!</span>
                 </div>
                 <div class="list-group-head-right">
-                  <span class="list-group-pct">{{ Math.round(group.pctOwned) }}%</span>
+                  <span class="list-group-pct" :style="{ color: pctColor(group.pctOwned) }">{{ Math.round(group.pctOwned) }}%</span>
                   <span class="list-group-chevron">{{
                     missingCollapsed.has(group.section.id) ? '▸' : '▾'
                   }}</span>
@@ -1438,9 +1464,10 @@ const userInitial = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 8px;
+  padding: 0 0 8px 10px;
   margin-bottom: 10px;
   border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
   font-weight: 700;
   font-size: 13px;
 }

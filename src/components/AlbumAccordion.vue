@@ -91,10 +91,9 @@ function openSection(sectionId: string) {
 }
 
 function barColor(pct: number, complete: boolean): string {
-  if (complete) return 'var(--mint)';
-  if (pct >= 75) return 'var(--gold)';
+  if (complete) return '#34d399';
+  if (pct >= 90) return 'var(--mint)';
   if (pct >= 50) return 'var(--gold)';
-  if (pct >= 25) return 'var(--gold)';
   return 'var(--coral)';
 }
 
@@ -146,8 +145,7 @@ defineExpose({ openSection });
           <div class="acc-group-bar">
             <div
               class="acc-group-fill"
-              :class="{ 'acc-fill-mint': gd.complete }"
-              :style="{ width: `${gd.pct}%` }"
+              :style="{ width: `${gd.pct}%`, background: barColor(gd.pct, gd.complete) }"
             />
           </div>
           <span class="acc-group-pct">{{ gd.pct }}%</span>
@@ -255,12 +253,8 @@ defineExpose({ openSection });
 }
 .acc-group-fill {
   height: 100%;
-  background: var(--gold);
   border-radius: 100px;
   transition: width 0.3s ease;
-}
-.acc-fill-mint {
-  background: var(--mint);
 }
 .acc-group-pct {
   font-family: var(--mono);
