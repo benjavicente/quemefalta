@@ -2,11 +2,24 @@
 import { Page, Route } from '@playwright/test';
 import { SUPABASE_URL, TEST_USER, TEST_SESSION, TEST_PROFILE } from './data';
 
+interface ErrorOverride {
+  /** HTTP status code to return */
+  status: number;
+  /** JSON body to return */
+  body?: any;
+  /** Only fail the first N requests, then succeed normally. 0 = fail forever. */
+  failCount?: number;
+}
+
 interface HandlerOptions {
   delay?: number;
   profile?: Record<string, any>;
   stickers?: Record<string, any>[];
   authenticated?: boolean;
+  /** Inject errors for specific REST methods on stickers endpoint */
+  stickerErrors?: { GET?: ErrorOverride; POST?: ErrorOverride; DELETE?: ErrorOverride };
+  /** Inject errors on auth token refresh */
+  authRefreshError?: ErrorOverride;
 }
 
 function json(route: Route, body: any, status = 200, delay = 50) {
@@ -31,10 +44,27 @@ function json(route: Route, body: any, status = 200, delay = 50) {
  * Uses URL path matching inside the handler to avoid glob issues with query strings.
  */
 export async function setupSupabaseRoutes(page: Page, options: HandlerOptions = {}) {
-  const { delay = 50, profile = TEST_PROFILE, stickers = [], authenticated = true } = options;
+  const {
+    delay = 50,
+    profile = TEST_PROFILE,
+    stickers = [],
+    authenticated = true,
+    stickerErrors = {},
+    authRefreshError,
+  } = options;
 
   const session = authenticated ? TEST_SESSION : null;
   const user = authenticated ? TEST_USER : null;
+
+  // Track error counts for failCount support
+  const errorCounts: Record<string, number> = {};
+
+  function shouldFail(override: ErrorOverride | undefined, key: string): boolean {
+    if (!override) return false;
+    if (!override.failCount) return true; // 0 or undefined = fail forever
+    errorCounts[key] = (errorCounts[key] || 0) + 1;
+    return errorCounts[key] <= override.failCount;
+  }
 
   const stickerStore = new Map<number, Record<string, any>>();
   for (const s of stickers) {
@@ -51,6 +81,9 @@ export async function setupSupabaseRoutes(page: Page, options: HandlerOptions = 
 
       // --- Auth ---
       if (path.includes('/auth/v1/token')) {
+        if (authRefreshError && shouldFail(authRefreshError, 'auth-refresh')) {
+          return json(route, authRefreshError.body ?? { error: 'Refresh failed' }, authRefreshError.status, delay);
+        }
         return json(route, session ?? { error: 'No session' }, session ? 200 : 401, delay);
       }
 
@@ -83,10 +116,18 @@ export async function setupSupabaseRoutes(page: Page, options: HandlerOptions = 
       // --- REST: stickers ---
       if (path.includes('/rest/v1/stickers')) {
         if (method === 'GET') {
+          const getErr = stickerErrors.GET;
+          if (getErr && shouldFail(getErr, 'sticker-GET')) {
+            return json(route, getErr.body ?? { message: 'Server error' }, getErr.status, delay);
+          }
           return json(route, Array.from(stickerStore.values()), 200, delay);
         }
 
         if (method === 'POST') {
+          const postErr = stickerErrors.POST;
+          if (postErr && shouldFail(postErr, 'sticker-POST')) {
+            return json(route, postErr.body ?? { message: 'Server error' }, postErr.status, delay);
+          }
           const body = route.request().postDataJSON?.();
           if (body) {
             const items = Array.isArray(body) ? body : [body];
@@ -98,6 +139,10 @@ export async function setupSupabaseRoutes(page: Page, options: HandlerOptions = 
         }
 
         if (method === 'DELETE') {
+          const delErr = stickerErrors.DELETE;
+          if (delErr && shouldFail(delErr, 'sticker-DELETE')) {
+            return json(route, delErr.body ?? { message: 'Server error' }, delErr.status, delay);
+          }
           const params = url.searchParams.toString();
           const singleMatch = params.match(/sticker_number=eq\.(\d+)/);
           if (singleMatch) stickerStore.delete(Number(singleMatch[1]));
@@ -125,11 +170,13 @@ export async function setupSupabaseRoutes(page: Page, options: HandlerOptions = 
 }
 
 /**
- * Injects a fake Supabase session into localStorage.
+ * Injects a fake Supabase session into localStorage and skips onboarding overlay.
  */
 export function injectSession(page: Page, session = TEST_SESSION) {
   return page.addInitScript((sess) => {
     const storageKey = 'sb-zxtnogvmpjgqfoegajgu-auth-token';
     localStorage.setItem(storageKey, JSON.stringify(sess));
+    // Skip onboarding guide overlay so it doesn't block E2E interactions
+    localStorage.setItem('quemefalta_onboarding_done', '1');
   }, session);
 }

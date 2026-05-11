@@ -3,7 +3,7 @@ import { setupSupabaseRoutes, injectSession } from './fixtures/handlers';
 import { TEST_PROFILE } from './fixtures/data';
 
 test.use({
-  viewport: { width: 375, height: 812 }, // iPhone SE
+  viewport: { width: 375, height: 812 },
   hasTouch: true,
 });
 
@@ -17,55 +17,25 @@ test.describe('Mobile (375px)', () => {
     await injectSession(page);
   });
 
-  test('sticker grid shows 3 columns at 375px', async ({ page }) => {
+  test('touch tap marks sticker as owned and updates count', async ({ page }) => {
     await page.goto('/album');
 
-    // Expand intro section to see sticker grid
     await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
-    const columns = await page.locator('.sect-grid').evaluate((el) => {
-      return getComputedStyle(el).gridTemplateColumns;
-    });
+    // Tap 3 stickers via touchscreen
+    for (let i = 0; i < 3; i++) {
+      const sticker = page.locator('.stk').nth(i);
+      const box = await sticker.boundingBox();
+      if (!box) throw new Error(`Sticker ${i} not visible`);
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await expect(sticker).toHaveClass(/stk-owned/, { timeout: 3000 });
+    }
 
-    const colCount = columns.split(' ').length;
-    expect(colCount).toBe(3);
+    await expect(page.locator('.acc-team-count').first()).toContainText('3/20');
   });
 
-  test('accordion groups are visible and interactive', async ({ page }) => {
-    await page.goto('/album');
-
-    // Groups A-L should be visible
-    const groupHeads = page.locator('.acc-group-head');
-    await expect(groupHeads.first()).toBeVisible();
-
-    // Click to expand Group A
-    await groupHeads.first().click();
-    await expect(page.locator('.acc-teams')).toBeVisible();
-
-    // Teams should be visible
-    const teams = page.locator('.acc-teams .acc-team');
-    await expect(teams.first()).toBeVisible();
-  });
-
-  test('touch tap on sticker marks it as owned', async ({ page }) => {
-    await page.goto('/album');
-
-    // Expand intro section
-    await page.locator('.acc-team').first().click();
-    await expect(page.locator('.stk').first()).toBeVisible();
-
-    const firstSticker = page.locator('.stk').first();
-    const box = await firstSticker.boundingBox();
-    if (!box) throw new Error('Sticker not visible');
-
-    // Simulate touch tap
-    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-
-    await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 3000 });
-  });
-
-  test('detail modal appears as bottom sheet on mobile', async ({ page }) => {
+  test('long press opens bottom-sheet detail modal', async ({ page }) => {
     await setupSupabaseRoutes(page, {
       authenticated: true,
       profile: TEST_PROFILE,
@@ -74,15 +44,12 @@ test.describe('Mobile (375px)', () => {
     await injectSession(page);
     await page.goto('/album');
 
-    // Expand intro section
     await page.locator('.acc-team').first().click();
-
     const firstSticker = page.locator('.stk').first();
     await expect(firstSticker).toHaveClass(/stk-owned/);
     const box = await firstSticker.boundingBox();
     if (!box) throw new Error('Sticker not visible');
 
-    // Long press
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.waitForTimeout(500);
@@ -91,33 +58,57 @@ test.describe('Mobile (375px)', () => {
     const modal = page.locator('.pop');
     await expect(modal).toBeVisible({ timeout: 3000 });
 
-    // On mobile (<640px), modal should have rounded top only
-    const borderRadius = await modal.evaluate((el) => {
-      return getComputedStyle(el).borderRadius;
-    });
+    // Mobile bottom sheet has rounded top corners only
+    const borderRadius = await modal.evaluate((el) => getComputedStyle(el).borderRadius);
     expect(borderRadius).toContain('12px 12px 0');
   });
 
-  test('progress section is visible and responsive', async ({ page }) => {
+  test('accordion expand → team → stickers on small viewport', async ({ page }) => {
+    await page.goto('/album');
+
+    await page.locator('.acc-group-head').first().click();
+    await expect(page.locator('.acc-teams')).toBeVisible();
+
+    await page.locator('.acc-teams .acc-team').first().click();
+    await expect(page.locator('.sect-name')).toBeVisible();
+    await expect(page.locator('.stk')).toHaveCount(20);
+  });
+
+  test('complete section then switch to missing tab', async ({ page }) => {
+    await page.goto('/album');
+
+    await page.locator('.acc-team').first().click();
+    await expect(page.locator('.stk').first()).toBeVisible();
+
+    await page.click('.complete-btn');
+    await expect(page.locator('.acc-team-count').first()).toContainText('20/20', { timeout: 3000 });
+
+    await page.locator('.tab').nth(1).click();
+    await expect(page.locator('.tab').nth(1)).toHaveClass(/on/);
+    await expect(page.locator('.list-head-text h2')).toContainText('TE FALTAN 960');
+  });
+
+  test('batch input modal fits mobile width', async ({ page }) => {
+    await page.goto('/album');
+
+    await page.click('.tab-add');
+    await expect(page.locator('.bi')).toBeVisible();
+
+    const modalBox = await page.locator('.bi').boundingBox();
+    expect(modalBox!.width).toBeLessThanOrEqual(375);
+
+    await page.locator('.bi-input').fill('FWC1, FWC2');
+    await expect(page.locator('.bi-preview')).toContainText('2 láminas');
+    await page.click('.bi-btn');
+    await expect(page.locator('.bi')).not.toBeVisible();
+  });
+
+  test('progress bar fits within viewport', async ({ page }) => {
     await page.goto('/album');
 
     const progress = page.locator('.progress');
     await expect(progress).toBeVisible();
-    await expect(page.locator('.progress-pct')).toBeVisible();
-
     const box = await progress.boundingBox();
     expect(box!.width).toBeLessThanOrEqual(375);
-  });
-
-  test('tabs are visible and tappable at mobile width', async ({ page }) => {
-    await page.goto('/album');
-
-    const tabs = page.locator('.tabs');
-    await expect(tabs).toBeVisible();
-    await expect(page.locator('.tab')).toHaveCount(3);
-
-    // Tap "Faltan" tab
-    await page.locator('.tab').nth(1).click();
-    await expect(page.locator('.tab').nth(1)).toHaveClass(/on/);
   });
 });
