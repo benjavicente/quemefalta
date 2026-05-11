@@ -70,7 +70,8 @@ describe('csvUtils', () => {
 
   describe('parseCsv', () => {
     it('parses a valid CSV with header', () => {
-      const csv = 'section,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20\nFWC,1,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+      const csv =
+        'section,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20\nFWC,1,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
       const { data, warnings } = parseCsv(csv);
       expect(data.get(1)).toBe(1); // FWC1
       expect(data.get(3)).toBe(3); // FWC3
@@ -86,13 +87,15 @@ describe('csvUtils', () => {
     });
 
     it('handles Windows line endings', () => {
-      const csv = 'section,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20\r\nFWC,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\r\n';
+      const csv =
+        'section,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20\r\nFWC,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\r\n';
       const { data } = parseCsv(csv);
       expect(data.get(1)).toBe(2);
     });
 
     it('strips BOM', () => {
-      const csv = '\uFEFFsection,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20\nFWC,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+      const csv =
+        '\uFEFFsection,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20\nFWC,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
       const { data } = parseCsv(csv);
       expect(data.get(1)).toBe(1);
     });
@@ -122,7 +125,9 @@ describe('csvUtils', () => {
     });
 
     it('throws on header-only file', () => {
-      expect(() => parseCsv('section,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20')).toThrow(CsvParseError);
+      expect(() => parseCsv('section,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20')).toThrow(
+        CsvParseError,
+      );
     });
 
     it('section codes are case-insensitive', () => {
@@ -135,9 +140,9 @@ describe('csvUtils', () => {
   describe('round-trip', () => {
     it('generateCsv → parseCsv preserves ownership and dupes', () => {
       const stickers: Record<number, StickerState> = {
-        1: makeState(true, 0),   // FWC1: qty 1
-        3: makeState(true, 2),   // FWC3: qty 3
-        21: makeState(true, 1),  // MEX1: qty 2
+        1: makeState(true, 0), // FWC1: qty 1
+        3: makeState(true, 2), // FWC3: qty 3
+        21: makeState(true, 1), // MEX1: qty 2
       };
       const csv = generateCsv(stickers);
       const { data } = parseCsv(csv);

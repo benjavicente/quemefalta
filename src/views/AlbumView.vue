@@ -350,7 +350,13 @@ const userInitial = computed(() => {
               <span>Mi perfil</span>
               <span class="pm-user">@{{ profile.username }}</span>
             </router-link>
-            <button class="pm-item" @click="showCsvModal = true; showProfileMenu = false">
+            <button
+              class="pm-item"
+              @click="
+                showCsvModal = true;
+                showProfileMenu = false;
+              "
+            >
               Exportar / Importar CSV
             </button>
             <button class="pm-item pm-danger" @click="handleLogout">Cerrar sesión</button>
@@ -587,11 +593,7 @@ const userInitial = computed(() => {
 
     <!-- STICKER SCANNER MODAL -->
     <StickerScanner v-if="showScanner" @add="handleScannerAdd" @close="showScanner = false" />
-    <CsvModal
-      v-if="showCsvModal"
-      @close="showCsvModal = false"
-      @imported="showCsvModal = false"
-    />
+    <CsvModal v-if="showCsvModal" @close="showCsvModal = false" @imported="showCsvModal = false" />
 
     <!-- LONG-PRESS TIP -->
     <Transition name="tip">

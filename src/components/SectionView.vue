@@ -17,8 +17,15 @@ const emit = defineEmits<{
   openDetail: [stickerNumber: number];
 }>();
 
-const { stickers, getSticker, cycleSticker, markSectionComplete, clearSection, setSticker } =
-  useStickers();
+const {
+  stickers,
+  getSticker,
+  cycleSticker,
+  decrementSticker,
+  markSectionComplete,
+  clearSection,
+  setSticker,
+} = useStickers();
 const { pushUndo } = useUndo();
 
 const showClearConfirm = ref(false);
@@ -219,6 +226,7 @@ onUnmounted(() => cleanupPaint());
             :variant="item.variant"
             :anim-delay="(paintOrder.get(item.number) ?? 0) * 40"
             @cycle="cycleSticker(item.number)"
+            @decrement="decrementSticker(item.number)"
             @open-detail="emit('openDetail', item.number)"
           />
         </div>
@@ -240,6 +248,7 @@ onUnmounted(() => cleanupPaint());
           :variant="item.variant"
           :anim-delay="(paintOrder.get(item.number) ?? 0) * 40"
           @cycle="cycleSticker(item.number)"
+          @decrement="decrementSticker(item.number)"
           @open-detail="emit('openDetail', item.number)"
         />
       </div>

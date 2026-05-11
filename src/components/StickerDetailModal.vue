@@ -33,10 +33,6 @@ watch(
   },
 );
 
-function setQuick(n: number) {
-  dupes.value = n;
-}
-
 function save() {
   emit('update', { dupes: dupes.value, note: note.value.trim() });
 }
@@ -107,18 +103,6 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
             <span class="step-total">TOTAL</span>
           </div>
           <button class="step-btn" @click="dupes++">+</button>
-        </div>
-
-        <!-- Quick chips -->
-        <div class="quick-row">
-          <button
-            v-for="q in [1, 2, 3]"
-            :key="q"
-            :class="['quick-chip', { on: dupes + 1 === q }]"
-            @click="setQuick(q - 1)"
-          >
-            ×{{ q }}
-          </button>
         </div>
 
         <!-- Note row -->
@@ -369,30 +353,6 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
   font-size: 10px;
   color: rgba(246, 241, 225, 0.55);
   letter-spacing: 0.18em;
-}
-
-/* Quick chips */
-.quick-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-.quick-chip {
-  flex: 1;
-  padding: 9px 0;
-  border-radius: 6px;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 700;
-  background: rgba(246, 241, 225, 0.04);
-  color: var(--chalk);
-  border: 1px solid var(--line);
-  cursor: pointer;
-}
-.quick-chip.on {
-  background: var(--gold);
-  color: var(--pitch-deep);
-  border-color: var(--gold);
 }
 
 /* Note row */

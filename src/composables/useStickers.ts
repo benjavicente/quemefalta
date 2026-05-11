@@ -158,7 +158,7 @@ function cycleSticker(stickerNumber: number, _skipUndo = false) {
         setSticker(stickerNumber, prevState, true);
       });
     }
-  } else if (current.dupes < 2) {
+  } else {
     setSticker(stickerNumber, { ...current, dupes: current.dupes + 1 });
     if (!_skipUndo) {
       const { pushUndo } = useUndo();
@@ -167,7 +167,6 @@ function cycleSticker(stickerNumber: number, _skipUndo = false) {
       });
     }
   }
-  // ×3 se queda — no vuelve a vacío por tap accidental
 }
 
 // Agregar múltiples stickers de golpe (ingreso por lotes)
@@ -419,10 +418,7 @@ async function clearSection(startsAt: number, count: number) {
  * @param mode 'replace' wipes everything; 'merge' only updates diffs (preserves notes)
  * @returns number of stickers changed
  */
-async function importBulk(
-  data: Map<number, number>,
-  mode: 'replace' | 'merge',
-): Promise<number> {
+async function importBulk(data: Map<number, number>, mode: 'replace' | 'merge'): Promise<number> {
   const { user } = useAuth();
   if (!user.value || sectionInFlight) return 0;
   sectionInFlight = true;
@@ -534,6 +530,27 @@ async function importBulk(
   }
 }
 
+// Botón "−": baja dupes de a 1, si es ×1 quita la lámina
+function decrementSticker(stickerNumber: number) {
+  if (inFlight.has(stickerNumber)) return;
+  const current = stickers.value[stickerNumber] ?? defaultState();
+  if (!current.owned) return;
+  const prevState = { ...current };
+  const { pushUndo } = useUndo();
+
+  if (current.dupes > 0) {
+    setSticker(stickerNumber, { ...current, dupes: current.dupes - 1 });
+    pushUndo('1 repetida quitada', () => {
+      setSticker(stickerNumber, prevState, true);
+    });
+  } else {
+    setSticker(stickerNumber, { owned: false, dupes: 0, note: '' });
+    pushUndo('1 lamina quitada', () => {
+      setSticker(stickerNumber, prevState, true);
+    });
+  }
+}
+
 function adjustDupes(stickerNumber: number, delta: number) {
   const current = stickers.value[stickerNumber] ?? defaultState();
   if (!current.owned) return;
@@ -618,5 +635,6 @@ export function useStickers() {
     addBatch,
     setNote,
     importBulk,
+    decrementSticker,
   };
 }

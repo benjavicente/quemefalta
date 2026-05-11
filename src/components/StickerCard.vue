@@ -16,6 +16,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   cycle: [];
+  decrement: [];
   openDetail: [];
 }>();
 
@@ -172,6 +173,16 @@ function onPointerCancel() {
       </div>
       <div v-if="hasNote" class="stk-note-dot" />
     </div>
+    <button
+      v-if="owned"
+      class="stk-minus"
+      aria-label="Quitar una copia"
+      @pointerdown.stop.prevent
+      @pointerup.stop="emit('decrement')"
+      @click.stop.prevent
+    >
+      −
+    </button>
   </div>
 </template>
 
@@ -415,6 +426,33 @@ function onPointerCancel() {
 .stk-squad.stk-owned .stk-variant-squad {
   background: rgba(10, 61, 46, 0.4);
   color: var(--pitch-deep);
+}
+
+/* Minus button below card */
+.stk-minus {
+  width: 100%;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(246, 241, 225, 0.08);
+  color: rgba(246, 241, 225, 0.45);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  touch-action: manipulation;
+}
+.stk-minus:hover {
+  background: rgba(239, 83, 80, 0.15);
+  color: var(--coral);
+}
+.stk-minus:active {
+  transform: scale(0.95);
 }
 
 /* Micro-animations */

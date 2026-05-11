@@ -128,7 +128,7 @@ describe('useStickers', () => {
       expect(stickers.value[10]?.dupes).toBe(2);
     });
 
-    it('stops cycling at owned(2 dupes) — does not cycle back to empty', async () => {
+    it('keeps incrementing dupes with no cap', async () => {
       setQueryResult({
         data: [createStickerDbRow(10, { owned: true, dupes: 2, note: null })],
         error: null,
@@ -141,9 +141,9 @@ describe('useStickers', () => {
       cycleSticker(10);
       await flushPromises();
 
-      // Should stay at owned(2 dupes) — cycleSticker does not cycle back to empty
+      // Should increment to 3 dupes — no cap
       expect(stickers.value[10]?.owned).toBe(true);
-      expect(stickers.value[10]?.dupes).toBe(2);
+      expect(stickers.value[10]?.dupes).toBe(3);
     });
   });
 
