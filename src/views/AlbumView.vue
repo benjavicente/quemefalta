@@ -13,6 +13,7 @@ import MissingView from '@/components/MissingView.vue';
 import DupesView from '@/components/DupesView.vue';
 import BatchInput from '@/components/BatchInput.vue';
 import StickerScanner from '@/components/StickerScanner.vue';
+import CsvModal from '@/components/CsvModal.vue';
 import UndoToast from '@/components/UndoToast.vue';
 import OnboardingGuide from '@/components/OnboardingGuide.vue';
 
@@ -60,6 +61,7 @@ const detailFor = ref<number | null>(null);
 const shareOpen = ref(false);
 const showBatchInput = ref(false);
 const showScanner = ref(false);
+const showCsvModal = ref(false);
 const showProfileMenu = ref(false);
 const sectionSearch = ref('');
 
@@ -348,6 +350,9 @@ const userInitial = computed(() => {
               <span>Mi perfil</span>
               <span class="pm-user">@{{ profile.username }}</span>
             </router-link>
+            <button class="pm-item" @click="showCsvModal = true; showProfileMenu = false">
+              Exportar / Importar CSV
+            </button>
             <button class="pm-item pm-danger" @click="handleLogout">Cerrar sesión</button>
           </div>
         </div>
@@ -582,6 +587,11 @@ const userInitial = computed(() => {
 
     <!-- STICKER SCANNER MODAL -->
     <StickerScanner v-if="showScanner" @add="handleScannerAdd" @close="showScanner = false" />
+    <CsvModal
+      v-if="showCsvModal"
+      @close="showCsvModal = false"
+      @imported="showCsvModal = false"
+    />
 
     <!-- LONG-PRESS TIP -->
     <Transition name="tip">

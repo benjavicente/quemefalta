@@ -413,6 +413,127 @@ async function clearSection(startsAt: number, count: number) {
   sectionInFlight = false;
 }
 
+/**
+ * Bulk import from CSV data.
+ * @param data Map<stickerNumber, quantity> where 0=missing, 1=owned, 2+=owned+dupes
+ * @param mode 'replace' wipes everything; 'merge' only updates diffs (preserves notes)
+ * @returns number of stickers changed
+ */
+async function importBulk(
+  data: Map<number, number>,
+  mode: 'replace' | 'merge',
+): Promise<number> {
+  const { user } = useAuth();
+  if (!user.value || sectionInFlight) return 0;
+  sectionInFlight = true;
+
+  if (!(await ensureFreshSession())) {
+    syncError.value = 'Sesión expirada. Recarga la página.';
+    sectionInFlight = false;
+    return 0;
+  }
+
+  const snapshot = { ...stickers.value };
+  const newMap: Record<number, StickerState> = mode === 'replace' ? {} : { ...stickers.value };
+  const upsertRows: {
+    user_id: string;
+    sticker_number: number;
+    owned: boolean;
+    dupes: number;
+    note: string | null;
+  }[] = [];
+  const deleteNums: number[] = [];
+  let changed = 0;
+
+  for (const [num, qty] of data) {
+    if (num < 1 || num > TOTAL_STICKERS) continue;
+    const current = snapshot[num];
+    const currentQty = current?.owned ? 1 + current.dupes : 0;
+
+    if (qty > 0) {
+      if (qty !== currentQty) {
+        const note = mode === 'merge' ? (current?.note ?? '') : '';
+        newMap[num] = { owned: true, dupes: qty - 1, note };
+        upsertRows.push({
+          user_id: user.value.id,
+          sticker_number: num,
+          owned: true,
+          dupes: qty - 1,
+          note: note || null,
+        });
+        changed++;
+      } else if (mode === 'replace') {
+        // Same qty but replace mode needs to keep it
+        newMap[num] = current!;
+      }
+    } else if (currentQty > 0) {
+      // CSV says 0 but we have it → delete
+      delete newMap[num];
+      deleteNums.push(num);
+      changed++;
+    }
+  }
+
+  // Replace mode: also delete stickers not in CSV
+  if (mode === 'replace') {
+    for (const numStr in snapshot) {
+      const num = Number(numStr);
+      if (!data.has(num) && snapshot[num]?.owned) {
+        delete newMap[num];
+        deleteNums.push(num);
+        changed++;
+      }
+    }
+  }
+
+  if (changed === 0) {
+    sectionInFlight = false;
+    return 0;
+  }
+
+  // Optimistic update
+  stickers.value = newMap;
+
+  const revert = () => {
+    stickers.value = snapshot;
+  };
+
+  try {
+    if (upsertRows.length > 0) {
+      const { error } = await withAuthRetry(() =>
+        supabase.from('stickers').upsert(upsertRows, { onConflict: 'user_id,sticker_number' }),
+      );
+      if (error) {
+        console.error('[useStickers] importBulk upsert error:', error);
+        revert();
+        syncError.value = error.message;
+        return 0;
+      }
+    }
+
+    if (deleteNums.length > 0) {
+      const { error } = await withAuthRetry(() =>
+        supabase
+          .from('stickers')
+          .delete()
+          .eq('user_id', user.value!.id)
+          .in('sticker_number', deleteNums),
+      );
+      if (error) {
+        console.error('[useStickers] importBulk delete error:', error);
+        revert();
+        syncError.value = error.message;
+        return 0;
+      }
+    }
+
+    syncError.value = null;
+    return changed;
+  } finally {
+    sectionInFlight = false;
+  }
+}
+
 function adjustDupes(stickerNumber: number, delta: number) {
   const current = stickers.value[stickerNumber] ?? defaultState();
   if (!current.owned) return;
@@ -496,5 +617,6 @@ export function useStickers() {
     clearSection,
     addBatch,
     setNote,
+    importBulk,
   };
 }
