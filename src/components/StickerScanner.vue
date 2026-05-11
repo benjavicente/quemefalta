@@ -1,162 +1,30 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
-import { createWorker, type Worker } from 'tesseract.js';
-import { extractCodes, type DetectedCode } from '@/lib/ocrUtils';
-import { preprocessImage } from '@/lib/canvasUtils';
+import type { DetectedCode } from '@/lib/ocrUtils';
+import { useCamera } from '@/composables/useCamera';
+import { useOcrWorker } from '@/composables/useOcrWorker';
 
 const emit = defineEmits<{
   add: [numbers: number[]];
   close: [];
 }>();
 
-// State
+// Refs for DOM elements
 const videoRef = ref<HTMLVideoElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
-const stream = ref<MediaStream | null>(null);
-const phase = ref<'camera' | 'processing' | 'results' | 'no-results'>('camera');
-const error = ref('');
-const ocrWorker = ref<Worker | null>(null);
-const workerReady = ref(false);
 
+// Composables
+const { worker, workerReady, initWorker, processCanvas, terminateWorker } = useOcrWorker();
+const { stream, error, liveHint, liveCodesPreview, startCamera, stopCamera } = useCamera(
+  videoRef,
+  worker,
+  workerReady,
+);
+
+// UI state
+const phase = ref<'camera' | 'processing' | 'results' | 'no-results'>('camera');
 const detectedCodes = ref<DetectedCode[]>([]);
 const rawOcrText = ref('');
-
-// ── Live preview state ──
-const liveHint = ref('');
-const liveCodesPreview = ref<string[]>([]);
-let liveScanning = false;
-let liveScanTimer: ReturnType<typeof setTimeout> | null = null;
-
-// Start camera
-async function startCamera() {
-  error.value = '';
-  try {
-    const mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
-    });
-    stream.value = mediaStream;
-    if (videoRef.value) {
-      videoRef.value.srcObject = mediaStream;
-      await videoRef.value.play();
-      startLivePreview();
-    }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
-      error.value = 'Permiso de camara denegado. Habilita el acceso a la camara en tu navegador.';
-    } else if (msg.includes('NotFoundError')) {
-      error.value = 'No se encontro una camara disponible en este dispositivo.';
-    } else {
-      error.value = `Error al acceder a la camara: ${msg}`;
-    }
-  }
-}
-
-// Stop camera
-function stopCamera() {
-  stopLivePreview();
-  if (stream.value) {
-    stream.value.getTracks().forEach((t) => t.stop());
-    stream.value = null;
-  }
-}
-
-// ── Live preview scanning ──
-// Grabs a low-res frame every ~2.5s and runs OCR to show a hint
-
-function startLivePreview() {
-  if (liveScanning) return;
-  liveScanning = true;
-  liveHint.value = '';
-  liveCodesPreview.value = [];
-  scheduleLiveScan();
-}
-
-function stopLivePreview() {
-  liveScanning = false;
-  if (liveScanTimer) {
-    clearTimeout(liveScanTimer);
-    liveScanTimer = null;
-  }
-}
-
-function scheduleLiveScan() {
-  if (!liveScanning) return;
-  liveScanTimer = setTimeout(() => runLiveScan(), 2500);
-}
-
-async function runLiveScan() {
-  if (!liveScanning || !videoRef.value || !ocrWorker.value || !workerReady.value) {
-    if (liveScanning) scheduleLiveScan();
-    return;
-  }
-
-  try {
-    const video = videoRef.value;
-    // Use small canvas for speed (480px wide)
-    const scale = Math.min(1, 480 / video.videoWidth);
-    const w = Math.round(video.videoWidth * scale);
-    const h = Math.round(video.videoHeight * scale);
-
-    const tmpCanvas = document.createElement('canvas');
-    tmpCanvas.width = w;
-    tmpCanvas.height = h;
-    const ctx = tmpCanvas.getContext('2d');
-    if (!ctx) {
-      scheduleLiveScan();
-      return;
-    }
-    ctx.drawImage(video, 0, 0, w, h);
-
-    // Preprocess for better OCR
-    const processed = preprocessImage(tmpCanvas);
-    const dataUrl = processed.toDataURL('image/jpeg', 0.8);
-
-    const result = await ocrWorker.value.recognize(dataUrl);
-    if (!liveScanning) return; // stopped while we were waiting
-
-    const text = result.data.text;
-    const codes = extractCodes(text);
-
-    if (codes.length > 0) {
-      liveCodesPreview.value = codes.map((c) => c.code);
-      liveHint.value = '';
-    } else if (text.trim().length < 5) {
-      liveHint.value = 'Apunta al sobre con los códigos';
-      liveCodesPreview.value = [];
-    } else {
-      liveHint.value = 'No se ven códigos — acércate más';
-      liveCodesPreview.value = [];
-    }
-  } catch {
-    // Silently ignore live scan errors
-  }
-
-  if (liveScanning) scheduleLiveScan();
-}
-
-// Initialize OCR worker
-async function initWorker() {
-  console.log('[Scanner] Initializing OCR worker...');
-  try {
-    const worker = await createWorker('eng');
-    await worker.setParameters({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tessedit_pageseg_mode: '11' as any, // Sparse text — better for sticker codes
-    });
-    ocrWorker.value = worker;
-    workerReady.value = true;
-    console.log('[Scanner] OCR worker ready');
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[Scanner] OCR init failed:', msg);
-    error.value = `Error inicializando OCR: ${msg}`;
-  }
-}
 
 // Capture snapshot from video
 function capture() {
@@ -178,46 +46,14 @@ async function processImage() {
   phase.value = 'processing';
   error.value = '';
 
-  // Wait for worker if not ready yet
-  if (!workerReady.value) {
-    await initWorker();
-  }
-
-  if (!ocrWorker.value) {
-    error.value = 'No se pudo inicializar el motor OCR.';
-    phase.value = 'camera';
-    startCamera();
-    return;
-  }
-
   try {
-    console.log('[Scanner] Processing image...');
-    // Preprocess: grayscale → contrast → binarize → 2x scale
-    const processed = preprocessImage(canvasRef.value);
-    const dataUrl = processed.toDataURL('image/png');
-    const result = await ocrWorker.value.recognize(dataUrl);
-    rawOcrText.value = result.data.text;
-    console.log('[Scanner] OCR raw text:', result.data.text);
-
-    const codes = extractCodes(result.data.text);
+    const { codes, rawText } = await processCanvas(canvasRef.value);
+    rawOcrText.value = rawText;
     detectedCodes.value = codes;
-
-    if (codes.length === 0) {
-      console.log('[Scanner] No sticker codes detected');
-      phase.value = 'no-results';
-    } else {
-      console.log(
-        '[Scanner] Detected',
-        codes.length,
-        'codes:',
-        codes.map((c) => c.code).join(', '),
-      );
-      phase.value = 'results';
-    }
+    phase.value = codes.length === 0 ? 'no-results' : 'results';
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[Scanner] OCR processing failed:', msg);
-    error.value = `Error al leer la imagen: ${msg}`;
+    error.value = msg;
     phase.value = 'camera';
     startCamera();
   }
@@ -261,9 +97,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopCamera();
-  if (ocrWorker.value) {
-    ocrWorker.value.terminate();
-  }
+  terminateWorker();
 });
 </script>
 
