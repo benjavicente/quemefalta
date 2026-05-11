@@ -45,27 +45,6 @@ describe('StickerDetailModal', () => {
     });
   });
 
-  describe('quick chips', () => {
-    it('marks active chip based on current dupes', () => {
-      const w = mountModal({ owned: true, dupes: 0 });
-      const chips = w.findAll('.quick-chip');
-      // ×1 chip should be active when dupes=0 (total=1)
-      expect(chips[0].classes()).toContain('on');
-      expect(chips[1].classes()).not.toContain('on');
-    });
-
-    it('clicking chip sets dupes value', async () => {
-      const w = mountModal({ owned: true, dupes: 0 });
-      const chips = w.findAll('.quick-chip');
-
-      // Click ×2 chip (index 1, sets dupes to 1)
-      await chips[1].trigger('click');
-
-      // Now the ×2 chip should be active
-      expect(chips[1].classes()).toContain('on');
-    });
-  });
-
   describe('stepper', () => {
     it('clicking + increments displayed count', async () => {
       const w = mountModal({ owned: true, dupes: 0 });

@@ -11,6 +11,7 @@ import ShareModal from '@/components/ShareModal.vue';
 import AlbumAccordion from '@/components/AlbumAccordion.vue';
 import MissingView from '@/components/MissingView.vue';
 import DupesView from '@/components/DupesView.vue';
+import CalculadoraView from '@/components/CalculadoraView.vue';
 import BatchInput from '@/components/BatchInput.vue';
 import StickerScanner from '@/components/StickerScanner.vue';
 import CsvModal from '@/components/CsvModal.vue';
@@ -38,14 +39,14 @@ const router = useRouter();
 
 // Leer estado inicial del hash de la URL
 const rawHash = route.hash.replace('#', '');
-const initialView: 'album' | 'missing' | 'dupes' =
-  rawHash === 'missing' ? 'missing' : rawHash === 'dupes' ? 'dupes' : 'album';
+const initialView: 'album' | 'missing' | 'dupes' | 'calc' =
+  rawHash === 'missing' ? 'missing' : rawHash === 'dupes' ? 'dupes' : rawHash === 'calc' ? 'calc' : 'album';
 const initialSection = ALBUM_SECTIONS.find((s) => s.id === rawHash)?.id ?? ALBUM_SECTIONS[0].id;
 
 const activeSection = ref(initialSection);
 const view = ref(initialView);
 
-function setView(v: 'album' | 'missing' | 'dupes') {
+function setView(v: 'album' | 'missing' | 'dupes' | 'calc') {
   view.value = v;
   if (v === 'album') {
     // Keep current section hash or clear
@@ -473,6 +474,9 @@ const userInitial = computed(() => {
         <button :class="['tab', { on: view === 'dupes' }]" @click="setView('dupes')">
           Repetidas {{ stats.dupes }}
         </button>
+        <button :class="['tab', { on: view === 'calc' }]" @click="setView('calc')">
+          Calculadora
+        </button>
         <!-- Scan button -->
         <button class="tab-scan" title="Escanear sobre" @click="showScanner = true">
           <svg
@@ -569,6 +573,9 @@ const userInitial = computed(() => {
         @open-detail="handleSectionOpenDetail"
         @copied="handleCopied"
       />
+
+      <!-- CALCULADORA VIEW -->
+      <CalculadoraView v-else-if="view === 'calc'" />
     </template>
 
     <!-- STICKER DETAIL MODAL (with prev/next) -->
