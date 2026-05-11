@@ -53,9 +53,9 @@ const metaInfo = computed(() => {
   const name = profile.value.display_name || profile.value.username;
   return {
     title: `${name} — ${stats.value.pct}% del álbum — QueMeFalta`,
-    description: `${name} tiene ${stats.value.owned} de ${TOTAL_STICKERS} láminas del álbum del Mundial 2026 (${stats.value.pct}% completo). Mira su progreso y conecta para canjear.`,
+    description: `${name} tiene ${stats.value.owned} de ${TOTAL_STICKERS} láminas del álbum del Mundial 2026 (${stats.value.pct}% completo). Mira su progreso y conecta para cambiar.`,
     ogTitle: `${name} — ${stats.value.pct}% del álbum del Mundial`,
-    ogDescription: `${stats.value.owned} láminas de ${TOTAL_STICKERS} (${stats.value.pct}% completo). ${stats.value.dupes > 0 ? `${stats.value.dupes} repetidas para canjear.` : ''}`,
+    ogDescription: `${stats.value.owned} láminas de ${TOTAL_STICKERS} (${stats.value.pct}% completo). ${stats.value.dupes > 0 ? `${stats.value.dupes} repetidas para cambiar.` : ''}`,
   };
 });
 
@@ -210,7 +210,7 @@ function goToMyAlbum() {
             {{ user ? 'Ver mi álbum' : 'Crear mi álbum' }}
           </button>
           <div class="cta-sub">
-            ¿Tienes láminas que canjear con {{ firstName }}? Contáctalo directamente.
+            ¿Tienes láminas que cambiar con {{ firstName }}? Contáctalo directamente.
           </div>
         </template>
       </div>

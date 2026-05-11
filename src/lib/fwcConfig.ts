@@ -5,6 +5,11 @@ export const FWC_CODE = 'FWC';
 export const FWC_HORIZONTAL_IMG =
   'https://img.freepik.com/vector-premium/estadio-futbol-pelota_302982-625.jpg';
 
+/** Per-sticker image overrides (1-based index → URL) */
+export const FWC_IMG_OVERRIDES: Record<number, string> = {
+  3: 'https://estudioarquitectos.cl/wp-content/uploads/2025/09/kvwjhTCeQxVX9uyV2UefZ7.jpg',
+};
+
 export const FWC_VERTICAL_IMG =
   'https://thumbs.dreamstime.com/b/copa-de-f%C3%BAtbol-dibujos-animados-sobre-el-fondo-del-estadio-con-confetti-atril-victoria-dorada-en-primer-plano-campeonato-confeti-277869230.jpg';
 

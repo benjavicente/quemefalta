@@ -29,7 +29,7 @@ const url = computed(() => {
 });
 
 const shareText = computed(() => {
-  return `Mira mi álbum del Mundial: tengo ${props.pct}% completo. ¿Tienes láminas que canjear?`;
+  return `Mira mi álbum del Mundial: tengo ${props.pct}% completo. ¿Tienes láminas que cambiar?`;
 });
 
 const shareTitle = computed(() => {

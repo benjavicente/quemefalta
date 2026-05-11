@@ -4,7 +4,7 @@ import type { StickerState } from '@/composables/useStickers';
 import ballImg from '@/assets/ball-stadium.png';
 import crestImg from '@/assets/ball-crest.jpg';
 import squadImg from '@/assets/field-squad.jpg';
-import { FWC_HORIZONTAL_IMG, FWC_VERTICAL_IMG } from '@/lib/fwcConfig';
+import { FWC_HORIZONTAL_IMG, FWC_VERTICAL_IMG, FWC_IMG_OVERRIDES } from '@/lib/fwcConfig';
 
 const props = defineProps<{
   number: number;
@@ -25,9 +25,17 @@ const isCrest = computed(() => props.variant === 'crest');
 const isSquad = computed(() => props.variant === 'squad');
 const isFwcH = computed(() => props.variant === 'fwc-h');
 const isFwcV = computed(() => props.variant === 'fwc-v');
+const fwcIndex = computed(() => {
+  if (!isFwcH.value && !isFwcV.value) return 0;
+  const m = props.code.match(/\d+$/);
+  return m ? parseInt(m[0]) : 0;
+});
 const cardImg = computed(() => {
-  if (isFwcH.value) return FWC_HORIZONTAL_IMG;
-  if (isFwcV.value) return FWC_VERTICAL_IMG;
+  if (isFwcH.value || isFwcV.value) {
+    const override = FWC_IMG_OVERRIDES[fwcIndex.value];
+    if (override) return override;
+    return isFwcH.value ? FWC_HORIZONTAL_IMG : FWC_VERTICAL_IMG;
+  }
   if (isCrest.value) return crestImg;
   if (isSquad.value) return squadImg;
   return ballImg;

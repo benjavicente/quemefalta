@@ -78,7 +78,7 @@ const steps: Step[] = [
   },
   {
     selector: '.tab:nth-child(3)',
-    text: 'Y aquí tus repetidas con la cantidad de cada una — también puedes copiar la lista para canjear.',
+    text: 'Y aquí tus repetidas con la cantidad de cada una — también puedes copiar la lista para cambiar.',
     position: 'top',
     setup: () => {
       const tab = document.querySelector('.tab:nth-child(3)') as HTMLElement;
@@ -87,7 +87,7 @@ const steps: Step[] = [
   },
   {
     selector: '.hdr-icon-btn[title="Compartir mi perfil"]',
-    text: 'Comparte tu perfil público para que otros vean tu progreso y te contacten para canjear.',
+    text: 'Comparte tu perfil público para que otros vean tu progreso y te contacten para cambiar.',
     position: 'bottom',
     setup: () => {
       // Volver al tab álbum
@@ -110,7 +110,7 @@ function updateTarget() {
   }
 
   // Scroll element into view first
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
 
   // Wait for scroll to settle, then position
   setTimeout(() => {
@@ -124,7 +124,8 @@ function updateTarget() {
     left = Math.max(padding, Math.min(left, window.innerWidth - tooltipWidth - padding));
 
     // Check if tooltip fits below the target
-    const fitsBelow = step.position === 'bottom' && rect.bottom + 16 + tooltipHeight < window.innerHeight;
+    const fitsBelow =
+      step.position === 'bottom' && rect.bottom + 16 + tooltipHeight < window.innerHeight;
     const fitsAbove = step.position === 'top' && rect.top - 16 - tooltipHeight > 0;
 
     if (step.position === 'bottom' && fitsBelow) {
