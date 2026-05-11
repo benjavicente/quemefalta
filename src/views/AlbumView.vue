@@ -6,10 +6,11 @@ import { useStickers } from '@/composables/useStickers';
 import { useMeta } from '@/composables/useMeta';
 import { ALBUM_SECTIONS, TOTAL_STICKERS, sectionForSticker, codeForSticker } from '@/lib/albumData';
 import { pctColor } from '@/lib/progressColors';
-import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import StickerDetailModal from '@/components/StickerDetailModal.vue';
 import ShareModal from '@/components/ShareModal.vue';
 import AlbumAccordion from '@/components/AlbumAccordion.vue';
+import MissingView from '@/components/MissingView.vue';
+import DupesView from '@/components/DupesView.vue';
 import BatchInput from '@/components/BatchInput.vue';
 import StickerScanner from '@/components/StickerScanner.vue';
 import UndoToast from '@/components/UndoToast.vue';
@@ -38,8 +39,7 @@ const router = useRouter();
 const rawHash = route.hash.replace('#', '');
 const initialView: 'album' | 'missing' | 'dupes' =
   rawHash === 'missing' ? 'missing' : rawHash === 'dupes' ? 'dupes' : 'album';
-const initialSection =
-  ALBUM_SECTIONS.find((s) => s.id === rawHash)?.id ?? ALBUM_SECTIONS[0].id;
+const initialSection = ALBUM_SECTIONS.find((s) => s.id === rawHash)?.id ?? ALBUM_SECTIONS[0].id;
 
 const activeSection = ref(initialSection);
 const view = ref(initialView);
@@ -118,18 +118,6 @@ function onFirstSticker() {
   }
 }
 
-// Missing view filters
-const missingGroupFilter = ref<string | null>(null);
-const missingSortBy = ref<'default' | 'almost'>('default');
-const missingCollapsed = ref<Set<string>>(new Set());
-
-function toggleMissingCollapse(sectionId: string) {
-  const s = new Set(missingCollapsed.value);
-  if (s.has(sectionId)) s.delete(sectionId);
-  else s.add(sectionId);
-  missingCollapsed.value = s;
-}
-
 const detailSectionName = computed(() => {
   if (detailFor.value === null) return '';
   return sectionForSticker(detailFor.value)?.name ?? '';
@@ -188,55 +176,6 @@ const filteredSections = computed(() => {
   );
 });
 
-const missingBySection = computed(() => {
-  let sections = ALBUM_SECTIONS.map((sec) => {
-    const items: number[] = [];
-    for (let i = 0; i < sec.count; i++) {
-      const num = sec.startsAt + i;
-      if (!stickers.value[num]?.owned) items.push(num);
-    }
-    const pctOwned = ((sec.count - items.length) / sec.count) * 100;
-    return { section: sec, items, pctOwned };
-  }).filter((g) => g.items.length > 0);
-
-  // Apply group filter
-  if (missingGroupFilter.value) {
-    sections = sections.filter(
-      (g) =>
-        g.section.group === missingGroupFilter.value ||
-        (!g.section.group && missingGroupFilter.value === 'intro'),
-    );
-  }
-
-  // Apply sort
-  if (missingSortBy.value === 'almost') {
-    sections = [...sections].sort((a, b) => b.pctOwned - a.pctOwned);
-  }
-
-  return sections;
-});
-
-const dupesList = computed(() => {
-  const out: { num: number; section: string; sectionId: string; count: number; note: string }[] =
-    [];
-  for (const sec of ALBUM_SECTIONS) {
-    for (let i = 0; i < sec.count; i++) {
-      const num = sec.startsAt + i;
-      const s = stickers.value[num];
-      if (s?.owned && s.dupes > 0) {
-        out.push({
-          num,
-          section: sec.name,
-          sectionId: sec.id,
-          count: s.dupes,
-          note: s.note,
-        });
-      }
-    }
-  }
-  return out.sort((a, b) => a.num - b.num);
-});
-
 // Tab previews
 const almostCompleteSections = computed(() => {
   return sectionsWithCounts.value
@@ -262,44 +201,11 @@ function selectFirstMatch() {
   }
 }
 
-function copyMissing() {
-  const lines: string[] = [`Me faltan ${stats.value.missing} láminas del álbum:`];
-  for (const group of missingBySection.value) {
-    lines.push(
-      `\n${group.section.name}: ${group.items.map((n: number) => codeForSticker(n)).join(', ')}`,
-    );
-  }
-  const text = lines.join('\n');
-  copyToClipboard(text);
-}
-
-function copyDupes() {
-  const lines: string[] = [`Tengo ${stats.value.dupes} láminas repetidas para canjear:`];
-  // Group dupes by section
-  const bySection = new Map<string, { code: string; count: number }[]>();
-  for (const d of dupesList.value) {
-    if (!bySection.has(d.section)) bySection.set(d.section, []);
-    bySection.get(d.section)!.push({ code: codeForSticker(d.num), count: d.count + 1 });
-  }
-  for (const [section, items] of bySection) {
-    lines.push(
-      `\n${section}: ${items.map((i) => `${i.code} (×${i.count})`).join(', ')}`,
-    );
-  }
-  const text = lines.join('\n');
-  copyToClipboard(text);
-}
-
-function copyToClipboard(text: string) {
-  navigator.clipboard?.writeText(text).then(
-    () => {
-      undoToast.value = { visible: true, message: '¡Lista copiada al portapapeles!', action: null };
-      setTimeout(() => {
-        undoToast.value.visible = false;
-      }, 2000);
-    },
-    () => alert('No se pudo copiar. Selecciona manualmente.'),
-  );
+function handleCopied(message: string) {
+  undoToast.value = { visible: true, message, action: null };
+  setTimeout(() => {
+    undoToast.value.visible = false;
+  }, 2000);
 }
 
 async function handleLogout() {
@@ -362,11 +268,6 @@ async function handleScannerAdd(numbers: number[]) {
       undoToast.value.visible = false;
     }, 3000);
   }
-}
-
-// Open detail for a dupe directly (instead of jumping to section)
-function openDupeDetail(num: number) {
-  detailFor.value = num;
 }
 
 function handleSectionOpenDetail(n: number) {
@@ -644,182 +545,19 @@ const userInitial = computed(() => {
         />
       </template>
 
-      <!-- MISSING VIEW with filters -->
-      <template v-else-if="view === 'missing'">
-        <div class="list-view">
-          <div class="list-head">
-            <div class="list-head-text">
-              <h2>TE FALTAN {{ stats.missing }}</h2>
-              <p>
-                Toca un número para ir a esa sección, o copia la lista para mandar por WhatsApp.
-              </p>
-            </div>
-            <button v-if="stats.missing > 0" class="copy-btn" @click="copyMissing">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <rect x="9" y="9" width="13" height="13" rx="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-              Copiar
-            </button>
-          </div>
+      <!-- MISSING VIEW -->
+      <MissingView
+        v-else-if="view === 'missing'"
+        @jump-to-section="jumpToSection"
+        @copied="handleCopied"
+      />
 
-          <!-- Filters -->
-          <div v-if="stats.missing > 0 && stats.missing < TOTAL_STICKERS" class="missing-filters">
-            <div class="mf-row">
-              <select v-model="missingGroupFilter" class="mf-select">
-                <option :value="null">Todos los grupos</option>
-                <option value="intro">Introducción</option>
-                <option v-for="g in 'ABCDEFGHIJKL'.split('')" :key="g" :value="g">
-                  Grupo {{ g }}
-                </option>
-              </select>
-              <select v-model="missingSortBy" class="mf-select">
-                <option value="default">Orden del álbum</option>
-                <option value="almost">Casi completas primero</option>
-              </select>
-            </div>
-          </div>
-
-          <div v-if="stats.missing === 0" class="empty">
-            <div class="empty-mark">
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--gold)"
-                stroke-width="1.5"
-              >
-                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                <path d="M4 22h16" />
-                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-              </svg>
-            </div>
-            <div class="empty-title">¡ÁLBUM COMPLETO!</div>
-            <div class="empty-sub">Vamos a celebrar.</div>
-          </div>
-          <div v-else class="list-grouped">
-            <div v-for="group in missingBySection" :key="group.section.id" class="list-group">
-              <div
-                class="list-group-head"
-                style="cursor: pointer"
-                :style="{ borderLeftColor: pctColor(group.pctOwned) }"
-                @click="toggleMissingCollapse(group.section.id)"
-              >
-                <div class="list-group-head-left">
-                  <span
-                    v-if="teamFlagEmoji(group.section.code)"
-                    class="list-group-flag"
-                    aria-hidden="true"
-                    >{{ teamFlagEmoji(group.section.code) }}</span
-                  >
-                  <span class="list-group-title"
-                    >{{ group.section.name }} ({{ group.items.length }})</span
-                  >
-                  <span v-if="group.pctOwned >= 90" class="almost-badge">¡Casi!</span>
-                </div>
-                <div class="list-group-head-right">
-                  <span class="list-group-pct" :style="{ color: pctColor(group.pctOwned) }">{{ Math.round(group.pctOwned) }}%</span>
-                  <span class="list-group-chevron">{{
-                    missingCollapsed.has(group.section.id) ? '▸' : '▾'
-                  }}</span>
-                </div>
-              </div>
-              <div v-if="!missingCollapsed.has(group.section.id)" class="list-numbers">
-                <button
-                  v-for="num in group.items"
-                  :key="num"
-                  class="list-num"
-                  @click="jumpToSection(group.section.id)"
-                >
-                  {{ codeForSticker(num) }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- DUPES VIEW (direct edit) -->
-      <template v-else-if="view === 'dupes'">
-        <div class="list-view">
-          <div class="list-head">
-            <div class="list-head-text">
-              <h2>TIENES {{ stats.dupes }} REPETIDAS</h2>
-              <p>Listas para canjear. Toca una para editar cantidad o notas.</p>
-            </div>
-            <button v-if="dupesList.length > 0" class="copy-btn" @click="copyDupes">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <rect x="9" y="9" width="13" height="13" rx="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-              Copiar
-            </button>
-          </div>
-          <div v-if="dupesList.length === 0" class="empty empty-dupes">
-            <div class="empty-stack">
-              <div class="empty-tile empty-tile-back-l" />
-              <div class="empty-tile empty-tile-back-r" />
-              <div class="empty-tile empty-tile-front">
-                <span class="empty-tile-q">?</span>
-              </div>
-              <div class="empty-sparkle-l">✦</div>
-              <div class="empty-sparkle-r">✦</div>
-            </div>
-            <div class="empty-title">NO TIENES REPETIDAS</div>
-            <div class="empty-sub">
-              Cuando marques cantidades en el álbum aparecerán aquí, listas para canjear.
-            </div>
-          </div>
-          <div v-else class="dupes-list">
-            <button
-              v-for="d in dupesList"
-              :key="d.num"
-              class="dupe-item"
-              @click="openDupeDetail(d.num)"
-            >
-              <div class="dupe-main">
-                <div class="dupe-num">{{ codeForSticker(d.num) }}</div>
-                <div class="dupe-info">
-                  <div class="dupe-section">{{ d.section }}</div>
-                  <div v-if="d.note" class="dupe-note">
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      style="flex-shrink: 0"
-                    >
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                    {{ d.note }}
-                  </div>
-                </div>
-              </div>
-              <div class="dupe-count">×{{ d.count + 1 }}</div>
-            </button>
-          </div>
-        </div>
-      </template>
+      <!-- DUPES VIEW -->
+      <DupesView
+        v-else-if="view === 'dupes'"
+        @open-detail="handleSectionOpenDetail"
+        @copied="handleCopied"
+      />
     </template>
 
     <!-- STICKER DETAIL MODAL (with prev/next) -->
@@ -1407,314 +1145,6 @@ const userInitial = computed(() => {
 }
 
 /* Missing view filters */
-.missing-filters {
-  margin-bottom: 16px;
-}
-.mf-row {
-  display: flex;
-  gap: 8px;
-}
-.mf-select {
-  flex: 1;
-  padding: 9px 12px;
-  background: rgba(246, 241, 225, 0.04);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--chalk);
-  font-family: inherit;
-  font-size: 12px;
-  outline: none;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23f6f1e1' stroke-opacity='0.4' stroke-width='1.5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 28px;
-}
-.mf-select:focus {
-  border-color: var(--gold);
-}
-.mf-select option {
-  background: #141c2b;
-  color: var(--chalk);
-}
-
-/* LIST VIEWS */
-.list-view {
-  padding: clamp(14px, 3vw, 28px);
-}
-.list-head {
-  margin-bottom: 18px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-.list-head-text h2 {
-  font-family: var(--display);
-  font-size: clamp(22px, 4vw, 36px);
-  letter-spacing: 0.02em;
-  line-height: 1;
-  margin: 0 0 6px;
-}
-.list-head-text p {
-  font-size: 11px;
-  color: rgba(246, 241, 225, 0.6);
-  line-height: 1.45;
-  margin: 0;
-}
-.copy-btn {
-  flex-shrink: 0;
-  padding: 10px 14px;
-  background: var(--gold);
-  color: var(--pitch-deep);
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.copy-btn:hover {
-  background: var(--gold-deep);
-}
-
-.list-grouped {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-.list-group-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0 8px 10px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--line);
-  border-left: 3px solid var(--gold);
-  font-weight: 700;
-  font-size: 13px;
-}
-.list-group-head-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1;
-}
-.list-group-flag {
-  flex-shrink: 0;
-  font-size: 1.15em;
-  line-height: 1;
-}
-.list-group-title {
-  min-width: 0;
-}
-.list-group-head-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.almost-badge {
-  font-family: var(--mono);
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--mint);
-  background: rgba(95, 194, 138, 0.12);
-  padding: 2px 7px;
-  border-radius: 100px;
-  letter-spacing: 0.05em;
-}
-.list-group-pct {
-  font-family: var(--mono);
-  font-size: 10px;
-  color: rgba(246, 241, 225, 0.4);
-}
-.list-group-chevron {
-  font-size: 10px;
-  color: rgba(246, 241, 225, 0.4);
-}
-.list-numbers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.list-num {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 6px 9px;
-  min-width: 30px;
-  text-align: center;
-  background: rgba(246, 241, 225, 0.04);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  color: var(--chalk);
-  cursor: pointer;
-}
-.list-num:hover {
-  background: var(--gold);
-  color: var(--pitch-deep);
-  border-color: var(--gold);
-}
-
-/* DUPES LIST */
-.dupes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.dupe-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px;
-  background: rgba(246, 241, 225, 0.025);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--coral);
-  border-radius: 6px;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  font-family: inherit;
-  color: inherit;
-}
-.dupe-item:hover {
-  background: rgba(246, 241, 225, 0.05);
-}
-.dupe-main {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  flex: 1;
-}
-.dupe-num {
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--gold);
-  line-height: 1;
-  flex-shrink: 0;
-  letter-spacing: 0.04em;
-}
-.dupe-info {
-  min-width: 0;
-}
-.dupe-section {
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dupe-note {
-  font-size: 10px;
-  color: rgba(246, 241, 225, 0.55);
-  margin-top: 3px;
-  font-style: italic;
-}
-.dupe-count {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--coral);
-  padding: 4px 10px;
-  background: rgba(226, 90, 58, 0.14);
-  border-radius: 100px;
-  flex-shrink: 0;
-}
-
-/* EMPTY STATES */
-.empty {
-  text-align: center;
-  padding: 60px 20px;
-}
-.empty-mark {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-.empty-title {
-  font-family: var(--display);
-  font-size: 22px;
-  letter-spacing: 0.05em;
-  margin-bottom: 6px;
-}
-.empty-sub {
-  color: rgba(246, 241, 225, 0.55);
-  font-size: 12px;
-  line-height: 1.5;
-  max-width: 240px;
-  margin: 0 auto;
-}
-.empty-dupes {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.empty-stack {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  margin-bottom: 20px;
-}
-.empty-tile {
-  position: absolute;
-  width: 76px;
-  height: 96px;
-  border-radius: 8px;
-}
-.empty-tile-back-l {
-  left: 14px;
-  top: 14px;
-  border: 1.5px dashed rgba(246, 241, 225, 0.18);
-  background: rgba(246, 241, 225, 0.02);
-  transform: rotate(-8deg);
-}
-.empty-tile-back-r {
-  right: 6px;
-  top: 8px;
-  border: 1.5px dashed rgba(246, 241, 225, 0.22);
-  background: rgba(246, 241, 225, 0.03);
-  transform: rotate(6deg);
-}
-.empty-tile-front {
-  left: 50%;
-  top: 6px;
-  transform: translateX(-50%) rotate(-1deg);
-  border: 1.5px dashed rgba(232, 179, 65, 0.45);
-  background: rgba(232, 179, 65, 0.04);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.empty-tile-q {
-  font-family: var(--display);
-  font-size: 38px;
-  color: rgba(232, 179, 65, 0.5);
-}
-.empty-sparkle-l {
-  position: absolute;
-  left: -6px;
-  bottom: 12px;
-  color: var(--gold);
-  font-size: 14px;
-  opacity: 0.7;
-}
-.empty-sparkle-r {
-  position: absolute;
-  right: 0;
-  bottom: 4px;
-  color: var(--gold);
-  font-size: 10px;
-  opacity: 0.5;
-}
-
 /* LONG-PRESS TIP */
 .longpress-tip {
   position: fixed;
