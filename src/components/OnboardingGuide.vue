@@ -14,28 +14,86 @@ interface Step {
   selector: string;
   text: string;
   position: 'bottom' | 'top';
+  /** If the element might not exist, try to open it first */
+  setup?: () => void;
 }
 
 const steps: Step[] = [
   {
-    selector: '[data-stk]:first-child .stk',
-    text: 'Toca una lamina para marcarla como tenida',
+    selector: '.acc-group-head',
+    text: 'Toca un grupo para ver sus equipos',
     position: 'bottom',
+  },
+  {
+    selector: '.acc-teams .acc-team',
+    text: 'Toca un equipo para desplegar sus láminas',
+    position: 'bottom',
+    setup: () => {
+      const head = document.querySelector('.acc-group-head') as HTMLElement;
+      if (head && !document.querySelector('.acc-teams')) {
+        head.click();
+      }
+    },
+  },
+  {
+    selector: '[data-stk]:first-child .stk',
+    text: 'Toca una lámina para marcarla. Tócala de nuevo y se vuelve repetida (×2, ×3…).',
+    position: 'bottom',
+    setup: () => {
+      // Open first team if none open
+      const team = document.querySelector('.acc-teams .acc-team') as HTMLElement;
+      if (team && !document.querySelector('.acc-content')) {
+        team.click();
+      }
+    },
   },
   {
     selector: '.sect-grid',
-    text: 'Arrastra el dedo para marcar varias de corrido',
+    text: 'Arrastra el dedo sobre varias láminas para marcarlas de corrido',
     position: 'bottom',
+  },
+  {
+    selector: '.complete-btn',
+    text: 'Toca "Completar" para marcar toda la sección de una vez',
+    position: 'top',
   },
   {
     selector: '.tab-add',
-    text: 'Usa Agregar para ingresar un sobre completo',
-    position: 'bottom',
+    text: 'Usa "Agregar" para ingresar un sobre completo escribiendo los códigos',
+    position: 'top',
   },
   {
     selector: '.tab:nth-child(2)',
-    text: 'Aqui ves tu lista de faltantes para intercambiar',
+    text: 'Aquí ves las que te faltan, agrupadas por equipo. Puedes copiar la lista para mandar por WhatsApp.',
+    position: 'top',
+    setup: () => {
+      const tab = document.querySelector('.tab:nth-child(2)') as HTMLElement;
+      if (tab) tab.click();
+    },
+  },
+  {
+    selector: '.copy-btn',
+    text: 'Este botón copia la lista de faltantes al portapapeles — listo para pegar en WhatsApp.',
+    position: 'top',
+  },
+  {
+    selector: '.tab:nth-child(3)',
+    text: 'Y aquí tus repetidas con la cantidad de cada una — también puedes copiar la lista para canjear.',
+    position: 'top',
+    setup: () => {
+      const tab = document.querySelector('.tab:nth-child(3)') as HTMLElement;
+      if (tab) tab.click();
+    },
+  },
+  {
+    selector: '.hdr-icon-btn[title="Compartir mi perfil"]',
+    text: 'Comparte tu perfil público para que otros vean tu progreso y te contacten para canjear.',
     position: 'bottom',
+    setup: () => {
+      // Volver al tab álbum
+      const tab = document.querySelector('.tab:nth-child(1)') as HTMLElement;
+      if (tab) tab.click();
+    },
   },
 ];
 
@@ -46,39 +104,58 @@ function updateTarget() {
   if (!step) return;
 
   const el = document.querySelector(step.selector) as HTMLElement | null;
-  if (!el) return;
-
-  const rect = el.getBoundingClientRect();
-  targetRect.value = rect;
-
-  // Position tooltip
-  const padding = 12;
-  const tooltipWidth = 280;
-  let left = rect.left + rect.width / 2 - tooltipWidth / 2;
-  // Keep tooltip within viewport
-  left = Math.max(padding, Math.min(left, window.innerWidth - tooltipWidth - padding));
-
-  if (step.position === 'bottom') {
-    tooltipStyle.value = {
-      top: `${rect.bottom + 16}px`,
-      left: `${left}px`,
-      width: `${tooltipWidth}px`,
-    };
-  } else {
-    tooltipStyle.value = {
-      bottom: `${window.innerHeight - rect.top + 16}px`,
-      left: `${left}px`,
-      width: `${tooltipWidth}px`,
-    };
+  if (!el) {
+    targetRect.value = null;
+    return;
   }
+
+  // Scroll element into view first
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // Wait for scroll to settle, then position
+  setTimeout(() => {
+    const rect = el.getBoundingClientRect();
+    targetRect.value = rect;
+
+    const padding = 12;
+    const tooltipWidth = 280;
+    const tooltipHeight = 120; // approximate
+    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+    left = Math.max(padding, Math.min(left, window.innerWidth - tooltipWidth - padding));
+
+    // Check if tooltip fits below the target
+    const fitsBelow = step.position === 'bottom' && rect.bottom + 16 + tooltipHeight < window.innerHeight;
+    const fitsAbove = step.position === 'top' && rect.top - 16 - tooltipHeight > 0;
+
+    if (step.position === 'bottom' && fitsBelow) {
+      tooltipStyle.value = {
+        top: `${rect.bottom + 16}px`,
+        left: `${left}px`,
+        width: `${tooltipWidth}px`,
+        transform: 'none',
+      };
+    } else if (step.position === 'top' && fitsAbove) {
+      tooltipStyle.value = {
+        top: `${rect.top - 16}px`,
+        left: `${left}px`,
+        width: `${tooltipWidth}px`,
+        transform: 'translateY(-100%)',
+      };
+    } else {
+      // Fallback: center tooltip in viewport
+      tooltipStyle.value = {
+        top: '50%',
+        left: `${left}px`,
+        width: `${tooltipWidth}px`,
+        transform: 'translateY(-50%)',
+      };
+    }
+  }, 300);
 }
 
 function nextStep() {
   if (currentStep.value < totalSteps - 1) {
     currentStep.value++;
-    nextTick(() => {
-      updateTarget();
-    });
   } else {
     finish();
   }
@@ -91,13 +168,16 @@ function finish() {
 }
 
 watch(currentStep, () => {
+  const step = steps[currentStep.value];
+  if (step?.setup) step.setup();
   nextTick(() => updateTarget());
 });
 
 onMounted(() => {
-  // Small delay to ensure elements are rendered
   setTimeout(() => {
     visible.value = true;
+    const step = steps[0];
+    if (step?.setup) step.setup();
     updateTarget();
   }, 500);
 
@@ -111,7 +191,7 @@ onUnmounted(() => {
 });
 
 const spotlightStyle = computed(() => {
-  if (!targetRect.value) return {};
+  if (!targetRect.value) return { display: 'none' };
   const pad = 6;
   return {
     top: `${targetRect.value.top - pad}px`,
@@ -125,11 +205,9 @@ const spotlightStyle = computed(() => {
 <template>
   <Teleport to="body">
     <Transition name="onb-fade">
-      <div v-if="visible" class="onb-overlay" @click.self="finish">
-        <!-- Spotlight cutout via box-shadow on a positioned div -->
+      <div v-if="visible" class="onb-overlay" @click.self="nextStep">
         <div class="onb-spotlight" :style="spotlightStyle" />
 
-        <!-- Tooltip -->
         <div class="onb-tooltip" :style="tooltipStyle">
           <div class="onb-step-indicator">{{ currentStep + 1 }}/{{ totalSteps }}</div>
           <p class="onb-text">{{ steps[currentStep].text }}</p>
@@ -139,6 +217,7 @@ const spotlightStyle = computed(() => {
               {{ currentStep < totalSteps - 1 ? 'Siguiente' : 'Listo' }}
             </button>
           </div>
+          <div class="onb-tap-hint">Toca fuera para avanzar</div>
         </div>
       </div>
     </Transition>
@@ -218,7 +297,7 @@ const spotlightStyle = computed(() => {
 .onb-next {
   padding: 8px 20px;
   background: var(--gold);
-  color: var(--pitch-deep, #0b1120);
+  color: var(--pitch-deep);
   border: none;
   border-radius: 6px;
   font-size: 12px;
@@ -232,7 +311,15 @@ const spotlightStyle = computed(() => {
   opacity: 0.9;
 }
 
-/* Transitions */
+.onb-tap-hint {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: rgba(246, 241, 225, 0.3);
+  text-align: center;
+  margin-top: 8px;
+  letter-spacing: 0.05em;
+}
+
 .onb-fade-enter-active {
   transition: opacity 0.3s ease;
 }
