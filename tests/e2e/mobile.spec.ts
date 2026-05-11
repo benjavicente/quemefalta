@@ -19,48 +19,40 @@ test.describe('Mobile (375px)', () => {
 
   test('sticker grid shows 3 columns at 375px', async ({ page }) => {
     await page.goto('/album');
+
+    // Expand intro section to see sticker grid
+    await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
-    // Check grid has 3 columns via computed style
     const columns = await page.locator('.sect-grid').evaluate((el) => {
       return getComputedStyle(el).gridTemplateColumns;
     });
 
-    // Should be 3 equal columns (3 values separated by spaces)
     const colCount = columns.split(' ').length;
     expect(colCount).toBe(3);
   });
 
-  test('section picker is horizontally scrollable', async ({ page }) => {
+  test('accordion groups are visible and interactive', async ({ page }) => {
     await page.goto('/album');
 
-    const picker = page.locator('.sec-picker');
-    await expect(picker).toBeVisible();
+    // Groups A-L should be visible
+    const groupHeads = page.locator('.acc-group-head');
+    await expect(groupHeads.first()).toBeVisible();
 
-    // Picker should overflow (scrollWidth > clientWidth for 49 chips)
-    const overflows = await picker.evaluate((el) => {
-      return el.scrollWidth > el.clientWidth;
-    });
-    expect(overflows).toBe(true);
-  });
+    // Click to expand Group A
+    await groupHeads.first().click();
+    await expect(page.locator('.acc-teams')).toBeVisible();
 
-  test('section picker can be scrolled to reveal more chips', async ({ page }) => {
-    await page.goto('/album');
-
-    const picker = page.locator('.sec-picker');
-    await expect(picker).toBeVisible();
-
-    // Scroll the picker to the right
-    await picker.evaluate((el) => {
-      el.scrollLeft = 300;
-    });
-
-    const scrollLeft = await picker.evaluate((el) => el.scrollLeft);
-    expect(scrollLeft).toBeGreaterThan(0);
+    // Teams should be visible
+    const teams = page.locator('.acc-teams .acc-team');
+    await expect(teams.first()).toBeVisible();
   });
 
   test('touch tap on sticker marks it as owned', async ({ page }) => {
     await page.goto('/album');
+
+    // Expand intro section
+    await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
     const firstSticker = page.locator('.stk').first();
@@ -74,7 +66,6 @@ test.describe('Mobile (375px)', () => {
   });
 
   test('detail modal appears as bottom sheet on mobile', async ({ page }) => {
-    // Start with owned sticker
     await setupSupabaseRoutes(page, {
       authenticated: true,
       profile: TEST_PROFILE,
@@ -83,26 +74,27 @@ test.describe('Mobile (375px)', () => {
     await injectSession(page);
     await page.goto('/album');
 
+    // Expand intro section
+    await page.locator('.acc-team').first().click();
+
     const firstSticker = page.locator('.stk').first();
     await expect(firstSticker).toHaveClass(/stk-owned/);
     const box = await firstSticker.boundingBox();
     if (!box) throw new Error('Sticker not visible');
 
-    // Long press via mouse (touch long-press is complex)
+    // Long press
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.waitForTimeout(500);
     await page.mouse.up();
 
-    // Modal should be visible at the bottom
     const modal = page.locator('.pop');
     await expect(modal).toBeVisible({ timeout: 3000 });
 
-    // On mobile (<640px), the modal should be at the bottom (border-radius top only)
+    // On mobile (<640px), modal should have rounded top only
     const borderRadius = await modal.evaluate((el) => {
       return getComputedStyle(el).borderRadius;
     });
-    // Should have rounded top corners and flat bottom
     expect(borderRadius).toContain('12px 12px 0');
   });
 
@@ -111,11 +103,8 @@ test.describe('Mobile (375px)', () => {
 
     const progress = page.locator('.progress');
     await expect(progress).toBeVisible();
-
-    // Progress percentage should be visible
     await expect(page.locator('.progress-pct')).toBeVisible();
 
-    // Check it fits within viewport width
     const box = await progress.boundingBox();
     expect(box!.width).toBeLessThanOrEqual(375);
   });
@@ -125,8 +114,6 @@ test.describe('Mobile (375px)', () => {
 
     const tabs = page.locator('.tabs');
     await expect(tabs).toBeVisible();
-
-    // All 3 tabs visible
     await expect(page.locator('.tab')).toHaveCount(3);
 
     // Tap "Faltan" tab

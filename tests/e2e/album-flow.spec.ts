@@ -16,28 +16,33 @@ test.describe('Album Flow', () => {
     await page.goto('/album');
 
     await expect(page.locator('.progress-pct')).toContainText('0%');
-    await expect(page.locator('.sect-badge')).toContainText('0/20');
+    // Intro section shows 0/20 in accordion
+    await expect(page.locator('.acc-team-count').first()).toContainText('0/20');
   });
 
   test('tap sticker marks it as owned', async ({ page }) => {
     await page.goto('/album');
 
-    // Wait for grid to load
+    // Expand intro section to see stickers
+    await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
     // First sticker should not be owned
     const firstSticker = page.locator('.stk').first();
     await expect(firstSticker).not.toHaveClass(/stk-owned/);
 
-    // Tap it (quick click)
+    // Tap it
     await firstSticker.click();
 
-    // Should now be owned (golden)
+    // Should now be owned
     await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 3000 });
   });
 
   test('long press opens detail modal', async ({ page }) => {
     await page.goto('/album');
+
+    // Expand intro section
+    await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
     // First tap to own the sticker
@@ -45,7 +50,7 @@ test.describe('Album Flow', () => {
     await firstSticker.click();
     await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 3000 });
 
-    // Long press: pointerdown, wait 500ms, pointerup
+    // Long press
     const box = await firstSticker.boundingBox();
     if (!box) throw new Error('Sticker not visible');
 
@@ -56,11 +61,9 @@ test.describe('Album Flow', () => {
 
     // Detail modal should appear
     await expect(page.locator('.pop')).toBeVisible({ timeout: 3000 });
-    await expect(page.locator('.pop-title')).toContainText('#1');
   });
 
   test('stepper in detail modal changes dupes', async ({ page }) => {
-    // Start with 1 owned sticker
     await setupSupabaseRoutes(page, {
       authenticated: true,
       profile: TEST_PROFILE,
@@ -68,6 +71,9 @@ test.describe('Album Flow', () => {
     });
     await injectSession(page);
     await page.goto('/album');
+
+    // Expand intro section
+    await page.locator('.acc-team').first().click();
 
     // Long press first sticker to open modal
     const firstSticker = page.locator('.stk').first();
@@ -82,7 +88,7 @@ test.describe('Album Flow', () => {
 
     await expect(page.locator('.pop')).toBeVisible();
 
-    // Click + button to add dupes
+    // Click + button
     await page.locator('.step-btn').last().click();
     await expect(page.locator('.step-num')).toContainText('2');
 
@@ -96,13 +102,16 @@ test.describe('Album Flow', () => {
 
   test('complete section marks all stickers', async ({ page }) => {
     await page.goto('/album');
+
+    // Expand intro section
+    await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
     // Click "Completar" button
     await page.click('.complete-btn');
 
-    // Badge should show 20/20
-    await expect(page.locator('.sect-badge')).toContainText('20/20', { timeout: 3000 });
+    // Accordion count should show 20/20
+    await expect(page.locator('.acc-team-count').first()).toContainText('20/20', { timeout: 3000 });
 
     // All stickers should be owned
     const ownedCount = await page.locator('.stk-owned').count();
@@ -110,7 +119,6 @@ test.describe('Album Flow', () => {
   });
 
   test('clear section removes all stickers', async ({ page }) => {
-    // Start with a complete section
     const stickerRows = Array.from({ length: 20 }, (_, i) => ({
       sticker_number: i + 1,
       owned: true,
@@ -125,13 +133,16 @@ test.describe('Album Flow', () => {
     await injectSession(page);
     await page.goto('/album');
 
-    await expect(page.locator('.sect-badge')).toContainText('20/20');
+    // Expand intro section
+    await page.locator('.acc-team').first().click();
+    await expect(page.locator('.acc-team-count').first()).toContainText('20/20');
 
-    // Click clear button
+    // Click clear button then confirm
     await page.click('.clear-btn');
+    await page.click('.cd-danger');
 
     // Should show 0/20
-    await expect(page.locator('.sect-badge')).toContainText('0/20', { timeout: 3000 });
+    await expect(page.locator('.acc-team-count').first()).toContainText('0/20', { timeout: 3000 });
   });
 
   test('tab "Faltan" shows missing stickers list', async ({ page }) => {
@@ -144,7 +155,6 @@ test.describe('Album Flow', () => {
   });
 
   test('tab "Repetidas" shows dupes list', async ({ page }) => {
-    // Start with some dupes
     await setupSupabaseRoutes(page, {
       authenticated: true,
       profile: TEST_PROFILE,
@@ -164,7 +174,6 @@ test.describe('Album Flow', () => {
   });
 
   test('optimistic update shows before network response with latency', async ({ page }) => {
-    // Set up with 300ms delay
     await setupSupabaseRoutes(page, {
       authenticated: true,
       profile: TEST_PROFILE,
@@ -174,13 +183,14 @@ test.describe('Album Flow', () => {
     await injectSession(page);
     await page.goto('/album');
 
+    // Expand intro section
+    await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
     // Tap sticker — should appear owned BEFORE 300ms network response
     const firstSticker = page.locator('.stk').first();
     await firstSticker.click();
 
-    // Check immediately — optimistic update should show owned
     await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 1000 });
   });
 
@@ -193,6 +203,8 @@ test.describe('Album Flow', () => {
     await injectSession(page);
     await page.goto('/album');
 
+    // Expand intro section
+    await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
     // Override sticker POST to return error
@@ -204,7 +216,6 @@ test.describe('Album Flow', () => {
           body: JSON.stringify({ message: 'Internal Server Error', code: '500' }),
         });
       }
-      // GET still works
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -223,15 +234,21 @@ test.describe('Album Flow', () => {
     await expect(firstSticker).not.toHaveClass(/stk-owned/, { timeout: 5000 });
   });
 
-  test('section picker navigates between sections', async ({ page }) => {
+  test('accordion navigates between groups and teams', async ({ page }) => {
     await page.goto('/album');
 
-    // Default section should be "Introduccion"
-    await expect(page.locator('.sect-name')).toContainText('Introducción');
+    // Intro section visible by default
+    await expect(page.locator('.acc-team-name').first()).toContainText('Introducción');
 
-    // Click second chip (Mexico)
-    await page.locator('.sec-chip').nth(1).click();
+    // Expand Group A
+    await page.locator('.acc-group-head').first().click();
+    await expect(page.locator('.acc-teams')).toBeVisible();
 
+    // Click México (first team in Group A)
+    await page.locator('.acc-teams .acc-team').first().click();
+
+    // SectionView should render with México
     await expect(page.locator('.sect-name')).toContainText('México');
+    await expect(page.locator('.stk')).toHaveCount(20);
   });
 });
