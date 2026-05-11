@@ -1,175 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { createWorker, type Worker } from 'tesseract.js';
-import { ALBUM_SECTIONS, stickerNumberFromCode } from '@/lib/albumData';
+import { extractCodes, type DetectedCode } from '@/lib/ocrUtils';
+import { preprocessImage } from '@/lib/canvasUtils';
 
 const emit = defineEmits<{
   add: [numbers: number[]];
   close: [];
 }>();
-
-// Valid section codes for matching
-const validCodes = new Set(ALBUM_SECTIONS.map((s) => s.code));
-const validCodesArray = ALBUM_SECTIONS.map((s) => s.code);
-
-// ── Fuzzy matching helpers ──
-
-/** Levenshtein distance between two strings */
-function levenshtein(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-    }
-  }
-  return dp[m][n];
-}
-
-/** Find closest valid section code within maxDist (default 1) */
-function fuzzyMatchCode(raw: string, maxDist = 1): string | null {
-  // Exact match first
-  if (validCodes.has(raw)) return raw;
-
-  // Too short for fuzzy — all album codes are 3 chars, need at least 2 for exact
-  if (raw.length < 3) return null;
-
-  let best: string | null = null;
-  let bestDist = maxDist + 1;
-
-  for (const code of validCodesArray) {
-    // Only compare codes of similar length (±1 char)
-    if (Math.abs(code.length - raw.length) > maxDist) continue;
-    const d = levenshtein(raw, code);
-    if (d < bestDist) {
-      bestDist = d;
-      best = code;
-    }
-  }
-  return best;
-}
-
-// ── Common OCR character substitutions ──
-const OCR_CHAR_FIXES: Record<string, string> = {
-  '0': 'O',
-
-  '1': 'I',
-
-  '5': 'S',
-  '8': 'B',
-  '{': '(',
-  '}': ')',
-  '[': '(',
-  ']': ')',
-};
-
-function fixOcrChars(s: string): string {
-  // In the letter portion, replace digits that look like letters
-  return s.replace(/[015{}\[\]8]/g, (ch) => OCR_CHAR_FIXES[ch] ?? ch);
-}
-
-// ── Image preprocessing ──
-
-/** Preprocess canvas for better OCR: grayscale → contrast → binarize → scale 2x */
-function preprocessImage(srcCanvas: HTMLCanvasElement): HTMLCanvasElement {
-  const w = srcCanvas.width;
-  const h = srcCanvas.height;
-  const srcCtx = srcCanvas.getContext('2d');
-  if (!srcCtx) return srcCanvas;
-
-  const srcData = srcCtx.getImageData(0, 0, w, h);
-  const pixels = srcData.data;
-
-  // Step 1: Convert to grayscale
-  const gray = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) {
-    const r = pixels[i * 4];
-    const g = pixels[i * 4 + 1];
-    const b = pixels[i * 4 + 2];
-    gray[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-  }
-
-  // Step 2: Contrast stretch (histogram equalization lite)
-  let min = 255;
-  let max = 0;
-  for (let i = 0; i < gray.length; i++) {
-    if (gray[i] < min) min = gray[i];
-    if (gray[i] > max) max = gray[i];
-  }
-  const range = max - min || 1;
-  for (let i = 0; i < gray.length; i++) {
-    gray[i] = Math.round(((gray[i] - min) / range) * 255);
-  }
-
-  // Step 3: Adaptive threshold (Otsu's method)
-  const histogram = new Uint32Array(256);
-  for (let i = 0; i < gray.length; i++) histogram[gray[i]]++;
-  const total = gray.length;
-  let sumAll = 0;
-  for (let i = 0; i < 256; i++) sumAll += i * histogram[i];
-  let sumBg = 0;
-  let wBg = 0;
-  let maxVariance = 0;
-  let threshold = 128;
-  for (let t = 0; t < 256; t++) {
-    wBg += histogram[t];
-    if (wBg === 0) continue;
-    const wFg = total - wBg;
-    if (wFg === 0) break;
-    sumBg += t * histogram[t];
-    const meanBg = sumBg / wBg;
-    const meanFg = (sumAll - sumBg) / wFg;
-    const variance = wBg * wFg * (meanBg - meanFg) * (meanBg - meanFg);
-    if (variance > maxVariance) {
-      maxVariance = variance;
-      threshold = t;
-    }
-  }
-
-  // Apply threshold → black text on white background
-  for (let i = 0; i < gray.length; i++) {
-    gray[i] = gray[i] > threshold ? 255 : 0;
-  }
-
-  // Step 4: Scale 2x for better OCR recognition
-  const scale = 2;
-  const outCanvas = document.createElement('canvas');
-  outCanvas.width = w * scale;
-  outCanvas.height = h * scale;
-  const outCtx = outCanvas.getContext('2d');
-  if (!outCtx) return srcCanvas;
-
-  // Write binarized image to a temp canvas first, then scale
-  const tmpCanvas = document.createElement('canvas');
-  tmpCanvas.width = w;
-  tmpCanvas.height = h;
-  const tmpCtx = tmpCanvas.getContext('2d');
-  if (!tmpCtx) return srcCanvas;
-
-  const outData = tmpCtx.createImageData(w, h);
-  for (let i = 0; i < gray.length; i++) {
-    outData.data[i * 4] = gray[i];
-    outData.data[i * 4 + 1] = gray[i];
-    outData.data[i * 4 + 2] = gray[i];
-    outData.data[i * 4 + 3] = 255;
-  }
-  tmpCtx.putImageData(outData, 0, 0);
-
-  // Scale up with nearest-neighbor (sharp edges)
-  outCtx.imageSmoothingEnabled = false;
-  outCtx.drawImage(tmpCanvas, 0, 0, w * scale, h * scale);
-
-  console.log(
-    `[Scanner] Preprocessed: ${w}x${h} → ${w * scale}x${h * scale}, threshold=${threshold}`,
-  );
-  return outCanvas;
-}
 
 // State
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -179,12 +17,6 @@ const phase = ref<'camera' | 'processing' | 'results' | 'no-results'>('camera');
 const error = ref('');
 const ocrWorker = ref<Worker | null>(null);
 const workerReady = ref(false);
-
-interface DetectedCode {
-  code: string;
-  stickerNumber: number;
-  selected: boolean;
-}
 
 const detectedCodes = ref<DetectedCode[]>([]);
 const rawOcrText = ref('');
@@ -338,70 +170,6 @@ function capture() {
   ctx.drawImage(video, 0, 0);
   stopCamera();
   processImage();
-}
-
-// Parse OCR text to extract sticker codes
-function extractCodes(text: string): DetectedCode[] {
-  const results: DetectedCode[] = [];
-  const seen = new Set<string>();
-
-  // Normalize text: uppercase, replace common OCR mistakes
-  let cleaned = text.toUpperCase();
-  // OCR often reads bullet points as various characters
-  cleaned = cleaned.replace(/[•·°*|~`#]/g, ' ');
-  // Remove dots/commas between digits (OCR artifact: "1.3" → "13", "1,3" → "13")
-  cleaned = cleaned.replace(/(\d)[.,](\d)/g, '$1$2');
-  // Normalize separators
-  cleaned = cleaned.replace(/[-–—_:;,./\\]/g, ' ');
-  // Remove extra whitespace
-  cleaned = cleaned.replace(/\s+/g, ' ');
-
-  // Two-pass extraction:
-  // Pass 1: clean letter prefixes (ALG 16, MEX5, BRA 12)
-  // Pass 2: mixed alphanumeric prefixes where OCR mangled letters into digits (C0L, 8RA)
-  const patterns: RegExp[] = [
-    /([A-Z]{2,4})\s*(\d{1,2})(?=\s|$|[^A-Z0-9])/g, // letters-only prefix
-    /([A-Z0-9]*[0-9][A-Z0-9]*)\s+(\d{1,2})(?=\s|$|[^A-Z0-9])/g, // mixed prefix (space required)
-  ];
-
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(cleaned)) !== null) {
-      let rawPrefix = match[1];
-      const num = match[2];
-
-      // Skip if prefix is all digits (not a code)
-      if (/^\d+$/.test(rawPrefix)) continue;
-
-      // Fix common OCR char substitutions in the prefix (0→O, 1→I, etc.)
-      rawPrefix = fixOcrChars(rawPrefix);
-
-      // Try exact match first, then fuzzy
-      const matchedCode = fuzzyMatchCode(rawPrefix);
-      if (!matchedCode) continue;
-
-      const codeStr = `${matchedCode}${num}`;
-      const stickerNum = stickerNumberFromCode(codeStr);
-      if (stickerNum === undefined) continue;
-
-      // Avoid duplicate entries
-      if (seen.has(codeStr)) continue;
-      seen.add(codeStr);
-
-      const wasFuzzy = matchedCode !== rawPrefix;
-      if (wasFuzzy) {
-        console.log(`[Scanner] Fuzzy: "${rawPrefix}" → "${matchedCode}" (code: ${codeStr})`);
-      }
-
-      results.push({
-        code: codeStr,
-        stickerNumber: stickerNum,
-        selected: true,
-      });
-    }
-  }
-
-  return results;
 }
 
 // Process captured image with OCR
