@@ -1,19 +1,21 @@
 /** FWC section layout & image configuration */
 
+import fwcHorizontalImg from '@/assets/fwc-horizontal.jpg';
+import fwcVerticalImg from '@/assets/fwc-vertical.jpg';
+import fwcOverride3Img from '@/assets/fwc-override-3.jpg';
+
 export const FWC_CODE = 'FWC';
 
-export const FWC_HORIZONTAL_IMG =
-  'https://img.freepik.com/vector-premium/estadio-futbol-pelota_302982-625.jpg';
+export const FWC_HORIZONTAL_IMG = fwcHorizontalImg;
 
-/** Per-sticker image overrides (1-based index → URL) */
+/** Per-sticker image overrides (0-based index → URL) */
 export const FWC_IMG_OVERRIDES: Record<number, string> = {
-  3: 'https://estudioarquitectos.cl/wp-content/uploads/2025/09/kvwjhTCeQxVX9uyV2UefZ7.jpg',
+  3: fwcOverride3Img,
 };
 
-export const FWC_VERTICAL_IMG =
-  'https://thumbs.dreamstime.com/b/copa-de-f%C3%BAtbol-dibujos-animados-sobre-el-fondo-del-estadio-con-confetti-atril-victoria-dorada-en-primer-plano-campeonato-confeti-277869230.jpg';
+export const FWC_VERTICAL_IMG = fwcVerticalImg;
 
-/** 1-based indices within FWC that are vertical (portrait) */
+/** 0-based indices within FWC that are vertical (portrait) */
 export const FWC_VERTICAL_RANGE: [number, number] = [4, 8];
 
 export function getFwcVariant(indexInSection: number): 'fwc-h' | 'fwc-v' {

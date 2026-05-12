@@ -6,16 +6,16 @@ describe('fwcConfig', () => {
     expect(FWC_CODE).toBe('FWC');
   });
 
-  it('vertical range is [4, 8]', () => {
+  it('vertical range is [4, 8] (0-based)', () => {
     expect(FWC_VERTICAL_RANGE).toEqual([4, 8]);
   });
 
   describe('getFwcVariant', () => {
-    it('returns fwc-h for index 1 (before vertical range)', () => {
-      expect(getFwcVariant(1)).toBe('fwc-h');
+    it('returns fwc-h for index 0', () => {
+      expect(getFwcVariant(0)).toBe('fwc-h');
     });
 
-    it('returns fwc-h for index 3 (just before vertical range)', () => {
+    it('returns fwc-h for index 3 (mascotas, horizontal)', () => {
       expect(getFwcVariant(3)).toBe('fwc-h');
     });
 
@@ -35,8 +35,8 @@ describe('fwcConfig', () => {
       expect(getFwcVariant(9)).toBe('fwc-h');
     });
 
-    it('returns fwc-h for index 20 (last sticker)', () => {
-      expect(getFwcVariant(20)).toBe('fwc-h');
+    it('returns fwc-h for index 19 (last sticker)', () => {
+      expect(getFwcVariant(19)).toBe('fwc-h');
     });
   });
 });

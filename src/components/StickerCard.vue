@@ -26,13 +26,14 @@ const isCrest = computed(() => props.variant === 'crest');
 const isSquad = computed(() => props.variant === 'squad');
 const isFwcH = computed(() => props.variant === 'fwc-h');
 const isFwcV = computed(() => props.variant === 'fwc-v');
+const isFwc = computed(() => isFwcH.value || isFwcV.value);
 const fwcIndex = computed(() => {
-  if (!isFwcH.value && !isFwcV.value) return 0;
+  if (!isFwc.value) return 0;
   const m = props.code.match(/\d+$/);
   return m ? parseInt(m[0]) : 0;
 });
 const cardImg = computed(() => {
-  if (isFwcH.value || isFwcV.value) {
+  if (isFwc.value) {
     const override = FWC_IMG_OVERRIDES[fwcIndex.value];
     if (override) return override;
     return isFwcH.value ? FWC_HORIZONTAL_IMG : FWC_VERTICAL_IMG;

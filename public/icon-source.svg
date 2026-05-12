@@ -4,17 +4,48 @@
       <stop offset="0%" stop-color="#0c1220"/>
       <stop offset="100%" stop-color="#1c2940"/>
     </linearGradient>
+    <linearGradient id="trophy" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#C8960C"/>
+    </linearGradient>
+    <linearGradient id="base" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#8B6914"/>
+      <stop offset="100%" stop-color="#5C4409"/>
+    </linearGradient>
     <radialGradient id="glow" cx="50%" cy="40%">
-      <stop offset="0%" stop-color="#f0b429" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#f0b429" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#FFD700" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#FFD700" stop-opacity="0"/>
     </radialGradient>
   </defs>
+  <!-- Background -->
   <rect width="512" height="512" rx="96" fill="url(#bg)"/>
   <rect width="512" height="512" rx="96" fill="url(#glow)"/>
-  <g transform="translate(256 270)">
-    <polygon
-      points="0,-160 47,-49 165,-49 70,22 106,135 0,65 -106,135 -70,22 -165,-49 -47,-49"
-      fill="#f0b429"
-    />
+  <!-- Trophy group centered -->
+  <g transform="translate(256 230)">
+    <!-- Cup body -->
+    <path d="M-90,-100h180v20c0 80-30 140-90 160-60-20-90-80-90-160v-20z" fill="url(#trophy)"/>
+    <!-- Left handle -->
+    <path d="M-90,-80h-40c0 0-10 0-10 20s10 60 35 60h15" fill="none" stroke="url(#trophy)" stroke-width="22" stroke-linecap="round"/>
+    <!-- Right handle -->
+    <path d="M90,-80h40c0 0 10 0 10 20s-10 60-35 60h-15" fill="none" stroke="url(#trophy)" stroke-width="22" stroke-linecap="round"/>
+    <!-- Stem -->
+    <rect x="-18" y="80" width="36" height="55" rx="8" fill="url(#trophy)"/>
+    <!-- Base top -->
+    <rect x="-70" y="135" width="140" height="35" rx="12" fill="url(#base)"/>
+    <!-- Base bottom -->
+    <rect x="-85" y="160" width="170" height="40" rx="14" fill="url(#base)"/>
+    <!-- Star -->
+    <polygon points="0,-70 15,-35 50,-35 22,-10 33,25 0,8 -33,25 -22,-10 -50,-35 -15,-35" fill="#FFF8DC" opacity="0.85"/>
+    <!-- Shine -->
+    <path d="M-60,-80c0 0 10 80 60 110" fill="none" stroke="#FFF8DC" stroke-width="6" stroke-linecap="round" opacity="0.3"/>
   </g>
+  <!-- Confetti -->
+  <circle cx="80" cy="80" r="10" fill="#FF6B6B" opacity="0.8"/>
+  <circle cx="430" cy="60" r="8" fill="#4ECDC4" opacity="0.8"/>
+  <circle cx="60" cy="200" r="7" fill="#FFE66D" opacity="0.8"/>
+  <circle cx="450" cy="190" r="9" fill="#FF6B6B" opacity="0.8"/>
+  <circle cx="90" cy="420" r="8" fill="#4ECDC4" opacity="0.8"/>
+  <circle cx="420" cy="430" r="10" fill="#FFE66D" opacity="0.8"/>
+  <circle cx="130" cy="50" r="6" fill="#A8E6CF" opacity="0.8"/>
+  <circle cx="380" cy="90" r="7" fill="#FF8A80" opacity="0.8"/>
 </svg>
