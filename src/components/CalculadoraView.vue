@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch, inject } from 'vue';
+import type { Ref } from 'vue';
 import { useStickers } from '@/composables/useStickers';
 import { TOTAL_STICKERS } from '@/lib/albumData';
 import {
@@ -9,29 +10,47 @@ import {
   projectionCurvesWithTrade,
 } from '@/lib/calcUtils';
 
+const isPreview = inject<Ref<boolean>>('isPreview', ref(false));
 const { stats } = useStickers();
+
+const ownedInput = ref(0);
+const dupesInput = ref(0);
+
+// Auto-fill from user data when logged in
+watch(
+  () => stats.value.owned,
+  (val) => { if (!isPreview.value) ownedInput.value = val; },
+  { immediate: true },
+);
+watch(
+  () => stats.value.dupes,
+  (val) => { if (!isPreview.value) dupesInput.value = val; },
+  { immediate: true },
+);
 
 const extraPacks = ref(50);
 const packPrice = ref(1100);
 const mlPrice = ref(1000);
-const tau = ref(50); // 0-100 slider, divide by 100 for calc
+const tradePeople = ref(5); // number of people you trade with
 
 const N = TOTAL_STICKERS;
-const K = computed(() => stats.value.owned);
-const currentDupes = computed(() => stats.value.dupes);
+const K = computed(() => Math.max(0, Math.min(N, ownedInput.value || 0)));
+const currentDupes = computed(() => Math.max(0, dupesInput.value || 0));
 const missing = computed(() => N - K.value);
-const tauDecimal = computed(() => tau.value / 100);
+// Map people count → tau with diminishing returns: tau = 1 - 0.88^n
+const tauDecimal = computed(() => tradePeople.value <= 0 ? 0 : Math.min(0.92, 1 - Math.pow(0.88, tradePeople.value)));
 
 const totalFromZero = computed(() => totalPacksFromZero(N));
 
-// Profile label for tau slider
-const tauProfile = computed(() => {
-  const t = tau.value;
-  if (t <= 10) return 'No voy a cambiar';
-  if (t <= 30) return 'Solo familia/pega';
-  if (t <= 50) return '1-2 grupos Telegram';
-  if (t <= 75) return 'Telegram + Plaza';
-  return 'Multi-canal, ferias, full';
+// Profile label for trade people slider
+const tradeProfile = computed(() => {
+  const n = tradePeople.value;
+  if (n === 0) return 'No cambio';
+  if (n <= 2) return 'Familia / pega';
+  if (n <= 5) return 'Amigos + conocidos';
+  if (n <= 10) return 'Grupo Telegram';
+  if (n <= 15) return 'Telegram + plaza';
+  return 'Varios grupos / ferias';
 });
 
 // Main simulation
@@ -99,13 +118,32 @@ function formatCLP(n: number): string {
     <!-- Tu estado -->
     <div class="calc-card">
       <div class="calc-label">TU ESTADO</div>
+      <div class="calc-estado-inputs">
+        <div class="calc-estado-field">
+          <label class="calc-input-label">Laminas que tengo</label>
+          <input
+            v-model.number="ownedInput"
+            type="number"
+            min="0"
+            :max="N"
+            class="calc-num calc-estado-num"
+          />
+        </div>
+        <div class="calc-estado-field">
+          <label class="calc-input-label">Repetidas</label>
+          <input
+            v-model.number="dupesInput"
+            type="number"
+            min="0"
+            class="calc-num calc-estado-num"
+          />
+        </div>
+      </div>
       <div class="calc-status">
         <span class="calc-status-num">{{ K }}</span> de {{ N }}
         <span class="calc-status-pct">({{ currentPct }}%)</span>
         <span class="calc-status-sep">·</span>
         Faltan <strong>{{ missing }}</strong>
-        <span class="calc-status-sep">·</span>
-        <span class="calc-status-dupes">{{ currentDupes }} repetidas</span>
       </div>
       <div class="calc-funfact">
         Completar el album sin cambiar necesita ~{{ totalFromZero.toLocaleString('es-CL') }} sobres en promedio
@@ -125,10 +163,10 @@ function formatCLP(n: number): string {
       </div>
 
       <div class="calc-input-row">
-        <label class="calc-input-label">Tasa de cambio: {{ tau }}%</label>
+        <label class="calc-input-label">Personas con las que cambio: {{ tradePeople }}</label>
         <div class="calc-slider-row">
-          <input v-model.number="tau" type="range" min="0" max="90" step="5" class="calc-range" />
-          <span class="calc-tau-label">{{ tauProfile }}</span>
+          <input v-model.number="tradePeople" type="range" min="0" max="20" step="1" class="calc-range" />
+          <span class="calc-tau-label">{{ tradeProfile }}</span>
         </div>
       </div>
 
@@ -163,8 +201,8 @@ function formatCLP(n: number): string {
         </div>
         <div class="calc-result">
           Cada lamina nueva te sale
-          <span class="calc-result-val">{{ formatCLP(tauDecimal > 0 ? sim.costPerNewReal : sim.costPerNewNaive) }}</span>
-          <template v-if="tauDecimal > 0">
+          <span class="calc-result-val">{{ formatCLP(tradePeople > 0 ? sim.costPerNewReal : sim.costPerNewNaive) }}</span>
+          <template v-if="tradePeople > 0">
             <span class="calc-result-hint">(seria {{ formatCLP(sim.costPerNewNaive) }} sin cambiar repes)</span>
           </template>
         </div>
@@ -304,6 +342,20 @@ function formatCLP(n: number): string {
   letter-spacing: 0.18em;
   color: var(--gold);
   margin-bottom: 10px;
+}
+
+/* Estado inputs */
+.calc-estado-inputs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.calc-estado-field {
+  flex: 1;
+}
+.calc-estado-num {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Status */
