@@ -21,7 +21,7 @@ test.describe('Preview Mode (unauthenticated)', () => {
     const banner = page.locator('.preview-banner');
     await expect(banner).toBeVisible();
     await expect(banner).toContainText('Modo preview');
-    await expect(banner).toContainText('Creá tu cuenta');
+    await expect(banner).toContainText('Crea tu cuenta');
   });
 
   test('can open groups and teams and see sticker grid', async ({ page }) => {
@@ -53,7 +53,7 @@ test.describe('Preview Mode (unauthenticated)', () => {
     // Login prompt modal should appear
     const prompt = page.locator('.login-prompt');
     await expect(prompt).toBeVisible({ timeout: 3000 });
-    await expect(prompt.locator('.login-prompt-title')).toContainText('Creá tu cuenta');
+    await expect(prompt.locator('.login-prompt-title')).toContainText('Crea tu cuenta');
   });
 
   test('login prompt has "Crear cuenta con Google" and "Seguir mirando" buttons', async ({ page }) => {
@@ -142,7 +142,7 @@ test.describe('Preview Mode (unauthenticated)', () => {
     await expect(page.locator('.bi')).not.toBeVisible();
     const prompt = page.locator('.login-prompt');
     await expect(prompt).toBeVisible({ timeout: 3000 });
-    await expect(prompt.locator('.login-prompt-title')).toContainText('Creá tu cuenta');
+    await expect(prompt.locator('.login-prompt-title')).toContainText('Crea tu cuenta');
   });
 
   test('scan button and "+ Agregar" button are visible in tabs', async ({ page }) => {

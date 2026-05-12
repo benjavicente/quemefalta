@@ -436,7 +436,7 @@ const userInitial = computed(() => {
     <!-- PREVIEW BANNER -->
     <div v-if="isPreview" class="preview-banner">
       <span>Modo preview — </span>
-      <router-link to="/auth" class="preview-link">Creá tu cuenta</router-link>
+      <router-link to="/auth" class="preview-link">Crea tu cuenta</router-link>
       <span> para guardar tu progreso</span>
     </div>
 
@@ -666,8 +666,8 @@ const userInitial = computed(() => {
               <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
             </svg>
           </div>
-          <div class="login-prompt-title">Creá tu cuenta</div>
-          <p class="login-prompt-text">Para marcar láminas, escanear sobres y llevar tu progreso necesitás una cuenta.</p>
+          <div class="login-prompt-title">Crea tu cuenta</div>
+          <p class="login-prompt-text">Para marcar láminas, escanear sobres y llevar tu progreso necesitas una cuenta.</p>
           <button class="login-prompt-btn" @click="router.push('/auth')">Crear cuenta con Google</button>
           <button class="login-prompt-dismiss" @click="showLoginPrompt = false">Seguir mirando</button>
         </div>

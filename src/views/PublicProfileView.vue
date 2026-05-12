@@ -314,7 +314,7 @@ function goToMyAlbum() {
             {{ user ? 'Ver mi álbum' : 'Crear mi álbum' }}
           </button>
           <div class="cta-sub">
-            ¿Tienes láminas que cambiar con {{ firstName }}? Contáctalo directamente.
+            ¿Tienes láminas que cambiar con {{ firstName }}? Contáctalo directo.
           </div>
         </template>
       </div>
