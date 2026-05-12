@@ -17,7 +17,7 @@ vi.mock('@/lib/canvasUtils', () => ({
 vi.mock('@/lib/ocrUtils', () => ({
   extractCodes: (text: string) => {
     if (text.includes('ALG 16')) {
-      return [{ code: 'ALG16', stickerNumber: 716, selected: true }];
+      return [{ code: 'ALG16', stickerNumber: 776, selected: true }];
     }
     return [];
   },

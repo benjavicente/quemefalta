@@ -93,7 +93,7 @@ describe('StickerScanner extractCodes', () => {
     const codes = extractCodes('FIFA WORLD CUP 2026 ALG 16');
     expect(codes).toHaveLength(1);
     expect(codes[0].code).toBe('ALG16');
-    expect(codes[0].stickerNumber).toBe(716);
+    expect(codes[0].stickerNumber).toBe(776);
   });
 
   it('extracts code without space: ALG16', () => {
@@ -143,7 +143,7 @@ describe('StickerScanner extractCodes', () => {
     const codes = extractCodes(ocrText);
     expect(codes).toHaveLength(1);
     expect(codes[0].code).toBe('ALG16');
-    expect(codes[0].stickerNumber).toBe(716);
+    expect(codes[0].stickerNumber).toBe(776);
   });
 
   it('extracts codes from multi-sticker OCR output', () => {
@@ -167,8 +167,8 @@ describe('StickerScanner fuzzy matching', () => {
     expect(codes[0].code).toBe('ARG1');
   });
 
-  it('corrects single-char typo: BRH → BRA', () => {
-    const codes = extractCodes('BRH 12');
+  it('corrects single-char typo: BRS → BRA', () => {
+    const codes = extractCodes('BRS 12');
     expect(codes).toHaveLength(1);
     expect(codes[0].code).toBe('BRA12');
   });
@@ -190,9 +190,9 @@ describe('StickerScanner fuzzy matching', () => {
     expect(codes[0].code).toBe('BRA7');
   });
 
-  it('combines OCR char fix + fuzzy: 8RH → BRH → BRA', () => {
-    // 8→B gives BRH, then fuzzy BRH→BRA (1 char diff)
-    const codes = extractCodes('8RH 4');
+  it('combines OCR char fix + fuzzy: 8RS → BRS → BRA', () => {
+    // 8→B gives BRS, then fuzzy BRS→BRA (1 char diff)
+    const codes = extractCodes('8RS 4');
     expect(codes).toHaveLength(1);
     expect(codes[0].code).toBe('BRA4');
   });

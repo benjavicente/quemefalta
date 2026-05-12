@@ -6,6 +6,7 @@ export interface AlbumSection {
   startsAt: number;
   group?: string;
   isTeam?: boolean;
+  zeroIndexed?: boolean;
 }
 
 interface TeamDef {
@@ -16,75 +17,75 @@ interface TeamDef {
 export const GROUPS: Record<string, TeamDef[]> = {
   A: [
     { name: 'México', code: 'MEX' },
-    { name: 'Ecuador', code: 'ECU' },
-    { name: 'Curazao', code: 'CUW' },
-    { name: 'Haití', code: 'HAI' },
+    { name: 'Sudáfrica', code: 'RSA' },
+    { name: 'Corea del Sur', code: 'KOR' },
+    { name: 'Chequia', code: 'CZE' },
   ],
   B: [
-    { name: 'Estados Unidos', code: 'USA' },
-    { name: 'Colombia', code: 'COL' },
-    { name: 'Nueva Zelanda', code: 'NZL' },
-    { name: 'Panamá', code: 'PAN' },
+    { name: 'Canadá', code: 'CAN' },
+    { name: 'Bosnia y Herzegovina', code: 'BIH' },
+    { name: 'Catar', code: 'QAT' },
+    { name: 'Suiza', code: 'SUI' },
   ],
   C: [
-    { name: 'Canadá', code: 'CAN' },
+    { name: 'Brasil', code: 'BRA' },
     { name: 'Marruecos', code: 'MAR' },
-    { name: 'Irak', code: 'IRQ' },
-    { name: 'Cabo Verde', code: 'CPV' },
+    { name: 'Haití', code: 'HAI' },
+    { name: 'Escocia', code: 'SCO' },
   ],
   D: [
-    { name: 'Argentina', code: 'ARG' },
-    { name: 'Chequia', code: 'CZE' },
-    { name: 'Sudáfrica', code: 'RSA' },
+    { name: 'Estados Unidos', code: 'USA' },
     { name: 'Paraguay', code: 'PAR' },
+    { name: 'Australia', code: 'AUS' },
+    { name: 'Turquía', code: 'TUR' },
   ],
   E: [
-    { name: 'Francia', code: 'FRA' },
-    { name: 'Austria', code: 'AUT' },
-    { name: 'Túnez', code: 'TUN' },
-    { name: 'Uzbekistán', code: 'UZB' },
+    { name: 'Alemania', code: 'GER' },
+    { name: 'Curazao', code: 'CUW' },
+    { name: 'Costa de Marfil', code: 'CIV' },
+    { name: 'Ecuador', code: 'ECU' },
   ],
   F: [
-    { name: 'Brasil', code: 'BRA' },
-    { name: 'Noruega', code: 'NOR' },
-    { name: 'Costa de Marfil', code: 'CIV' },
-    { name: 'Jordania', code: 'JOR' },
+    { name: 'Países Bajos', code: 'NED' },
+    { name: 'Japón', code: 'JPN' },
+    { name: 'Suecia', code: 'SWE' },
+    { name: 'Túnez', code: 'TUN' },
   ],
   G: [
-    { name: 'Inglaterra', code: 'ENG' },
-    { name: 'Uruguay', code: 'URU' },
+    { name: 'Bélgica', code: 'BEL' },
+    { name: 'Egipto', code: 'EGY' },
     { name: 'Irán', code: 'IRN' },
-    { name: 'Ghana', code: 'GHA' },
+    { name: 'Nueva Zelanda', code: 'NZL' },
   ],
   H: [
     { name: 'España', code: 'ESP' },
-    { name: 'Turquía', code: 'TUR' },
-    { name: 'Congo DR', code: 'COD' },
-    { name: 'Bosnia y Herzegovina', code: 'BIH' },
+    { name: 'Cabo Verde', code: 'CPV' },
+    { name: 'Arabia Saudita', code: 'KSA' },
+    { name: 'Uruguay', code: 'URU' },
   ],
   I: [
-    { name: 'Alemania', code: 'GER' },
-    { name: 'Bélgica', code: 'BEL' },
-    { name: 'Argelia', code: 'ALG' },
-    { name: 'Egipto', code: 'EGY' },
+    { name: 'Francia', code: 'FRA' },
+    { name: 'Senegal', code: 'SEN' },
+    { name: 'Irak', code: 'IRQ' },
+    { name: 'Noruega', code: 'NOR' },
   ],
   J: [
-    { name: 'Portugal', code: 'POR' },
-    { name: 'Croacia', code: 'CRO' },
-    { name: 'Senegal', code: 'SEN' },
-    { name: 'Escocia', code: 'SCO' },
+    { name: 'Argentina', code: 'ARG' },
+    { name: 'Argelia', code: 'ALG' },
+    { name: 'Austria', code: 'AUT' },
+    { name: 'Jordania', code: 'JOR' },
   ],
   K: [
-    { name: 'Países Bajos', code: 'NED' },
-    { name: 'Japón', code: 'JPN' },
-    { name: 'Arabia Saudita', code: 'KSA' },
-    { name: 'Suecia', code: 'SWE' },
+    { name: 'Portugal', code: 'POR' },
+    { name: 'RD Congo', code: 'COD' },
+    { name: 'Uzbekistán', code: 'UZB' },
+    { name: 'Colombia', code: 'COL' },
   ],
   L: [
-    { name: 'Corea del Sur', code: 'KOR' },
-    { name: 'Suiza', code: 'SUI' },
-    { name: 'Catar', code: 'QAT' },
-    { name: 'Australia', code: 'AUS' },
+    { name: 'Inglaterra', code: 'ENG' },
+    { name: 'Croacia', code: 'CRO' },
+    { name: 'Ghana', code: 'GHA' },
+    { name: 'Panamá', code: 'PAN' },
   ],
 };
 
@@ -113,6 +114,7 @@ export const ALBUM_SECTIONS: AlbumSection[] = [
     code: 'FWC',
     count: 20,
     startsAt: 1,
+    zeroIndexed: true,
   },
   ...teamSections,
 ];
@@ -129,12 +131,14 @@ export function sectionForSticker(stickerNumber: number): AlbumSection | undefin
 export function codeForSticker(stickerNumber: number): string {
   const sec = sectionForSticker(stickerNumber);
   if (!sec) return `?${stickerNumber}`;
-  const indexInSection = stickerNumber - sec.startsAt + 1;
+  const indexInSection = sec.zeroIndexed
+    ? stickerNumber - sec.startsAt
+    : stickerNumber - sec.startsAt + 1;
   return `${sec.code}${indexInSection}`;
 }
 
 /**
- * Inverse of codeForSticker: "MEX5" → 25, "FWC1" → 1
+ * Inverse of codeForSticker: "MEX5" → 25, "FWC0" → 1
  * Returns undefined if code is invalid.
  */
 export function stickerNumberFromCode(code: string): number | undefined {
@@ -143,6 +147,11 @@ export function stickerNumberFromCode(code: string): number | undefined {
   const [, prefix, numStr] = match;
   const idx = parseInt(numStr);
   const sec = ALBUM_SECTIONS.find((s) => s.code === prefix);
-  if (!sec || idx < 1 || idx > sec.count) return undefined;
+  if (!sec) return undefined;
+  if (sec.zeroIndexed) {
+    if (idx < 0 || idx >= sec.count) return undefined;
+    return sec.startsAt + idx;
+  }
+  if (idx < 1 || idx > sec.count) return undefined;
   return sec.startsAt + idx - 1;
 }

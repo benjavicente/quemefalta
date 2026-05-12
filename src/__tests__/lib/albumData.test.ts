@@ -107,9 +107,9 @@ describe('albumData', () => {
       expect(sec?.code).toBe('MEX');
     });
 
-    it('returns last team (Australia) for sticker 980', () => {
+    it('returns last team (Panama) for sticker 980', () => {
       const sec = sectionForSticker(980);
-      expect(sec?.code).toBe('AUS');
+      expect(sec?.code).toBe('PAN');
     });
 
     it('returns undefined for sticker 0 (out of bounds)', () => {
@@ -122,12 +122,12 @@ describe('albumData', () => {
   });
 
   describe('codeForSticker', () => {
-    it('returns FWC1 for sticker 1', () => {
-      expect(codeForSticker(1)).toBe('FWC1');
+    it('returns FWC0 for sticker 1 (0-based intro)', () => {
+      expect(codeForSticker(1)).toBe('FWC0');
     });
 
-    it('returns FWC20 for sticker 20', () => {
-      expect(codeForSticker(20)).toBe('FWC20');
+    it('returns FWC19 for sticker 20 (0-based intro)', () => {
+      expect(codeForSticker(20)).toBe('FWC19');
     });
 
     it('returns MEX1 for sticker 21', () => {
@@ -138,8 +138,8 @@ describe('albumData', () => {
       expect(codeForSticker(40)).toBe('MEX20');
     });
 
-    it('returns AUS20 for sticker 980', () => {
-      expect(codeForSticker(980)).toBe('AUS20');
+    it('returns PAN20 for sticker 980', () => {
+      expect(codeForSticker(980)).toBe('PAN20');
     });
 
     it('returns ?N for invalid sticker number', () => {
@@ -149,8 +149,12 @@ describe('albumData', () => {
   });
 
   describe('stickerNumberFromCode', () => {
-    it('returns 1 for FWC1', () => {
-      expect(stickerNumberFromCode('FWC1')).toBe(1);
+    it('returns 1 for FWC0 (0-based intro)', () => {
+      expect(stickerNumberFromCode('FWC0')).toBe(1);
+    });
+
+    it('returns 20 for FWC19', () => {
+      expect(stickerNumberFromCode('FWC19')).toBe(20);
     });
 
     it('returns 21 for MEX1', () => {
@@ -173,6 +177,7 @@ describe('albumData', () => {
     it('returns undefined for out-of-range index', () => {
       expect(stickerNumberFromCode('MEX0')).toBeUndefined();
       expect(stickerNumberFromCode('MEX21')).toBeUndefined();
+      expect(stickerNumberFromCode('FWC20')).toBeUndefined();
     });
 
     it('returns undefined for non-code strings', () => {

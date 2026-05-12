@@ -24,7 +24,7 @@ describe('fuzzyMatchCode', () => {
 
   it('corrects 1-char typo', () => {
     expect(fuzzyMatchCode('MBX')).toBe('MEX'); // B→E
-    expect(fuzzyMatchCode('BRH')).toBe('BRA'); // H→A
+    expect(fuzzyMatchCode('BRS')).toBe('BRA'); // S→A
   });
 
   it('returns null for 2+ char distance', () => {
@@ -55,7 +55,7 @@ describe('extractCodes', () => {
     const codes = extractCodes('ALG 16');
     expect(codes).toHaveLength(1);
     expect(codes[0].code).toBe('ALG16');
-    expect(codes[0].stickerNumber).toBe(716);
+    expect(codes[0].stickerNumber).toBe(776);
   });
 
   it('extracts code without space', () => {
