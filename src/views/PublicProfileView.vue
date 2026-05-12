@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { supabase, ensureFreshSession } from '@/lib/supabase';
 import { useAuth } from '@/composables/useAuth';
-import { TOTAL_STICKERS } from '@/lib/albumData';
+import { TOTAL_STICKERS, ALBUM_SECTIONS, codeForSticker } from '@/lib/albumData';
 import { useMeta } from '@/composables/useMeta';
 
 interface PublicProfile {
@@ -22,6 +22,8 @@ const { user } = useAuth();
 const profile = ref<PublicProfile | null>(null);
 const loading = ref(true);
 const notFound = ref(false);
+const stickerMap = ref<Map<number, { owned: boolean; dupes: number }>>(new Map());
+const copied = ref('');
 
 const username = computed(() => route.params.username as string);
 
@@ -66,6 +68,55 @@ const userInitial = computed(() => {
   return name.charAt(0).toUpperCase();
 });
 
+const missingBySection = computed(() => {
+  if (stickerMap.value.size === 0 && stats.value.owned === 0) return [];
+  return ALBUM_SECTIONS.map((sec) => {
+    const items: number[] = [];
+    for (let i = 0; i < sec.count; i++) {
+      const num = sec.startsAt + i;
+      if (!stickerMap.value.get(num)?.owned) items.push(num);
+    }
+    return { section: sec, items };
+  }).filter((g) => g.items.length > 0);
+});
+
+const dupesBySection = computed(() => {
+  const groups = new Map<string, { section: string; items: { code: string; count: number }[] }>();
+  for (const sec of ALBUM_SECTIONS) {
+    for (let i = 0; i < sec.count; i++) {
+      const num = sec.startsAt + i;
+      const s = stickerMap.value.get(num);
+      if (s?.owned && s.dupes > 0) {
+        if (!groups.has(sec.id)) groups.set(sec.id, { section: sec.name, items: [] });
+        groups.get(sec.id)!.items.push({ code: codeForSticker(num), count: s.dupes + 1 });
+      }
+    }
+  }
+  return [...groups.values()];
+});
+
+function copyMissing() {
+  const lines = [`A ${firstName.value} le faltan ${stats.value.missing} láminas:`];
+  for (const g of missingBySection.value) {
+    lines.push(`${g.section.name}: ${g.items.map((n) => codeForSticker(n)).join(', ')}`);
+  }
+  navigator.clipboard?.writeText(lines.join('\n')).then(() => {
+    copied.value = 'Faltantes copiadas';
+    setTimeout(() => { copied.value = ''; }, 2000);
+  });
+}
+
+function copyDupes() {
+  const lines = [`${firstName.value} tiene ${stats.value.dupes} repetidas para cambiar:`];
+  for (const g of dupesBySection.value) {
+    lines.push(`${g.section}: ${g.items.map((i) => `${i.code} (×${i.count})`).join(', ')}`);
+  }
+  navigator.clipboard?.writeText(lines.join('\n')).then(() => {
+    copied.value = 'Repetidas copiadas';
+    setTimeout(() => { copied.value = ''; }, 2000);
+  });
+}
+
 onMounted(async () => {
   loading.value = true;
 
@@ -91,6 +142,19 @@ onMounted(async () => {
       notFound.value = true;
     } else {
       profile.value = data as PublicProfile;
+
+      // Fetch individual sticker data for missing/dupes lists
+      const { data: stickers } = await supabase
+        .from('public_user_stickers')
+        .select('sticker_number, owned, dupes')
+        .eq('username', username.value);
+      if (stickers) {
+        const map = new Map<number, { owned: boolean; dupes: number }>();
+        for (const s of stickers) {
+          map.set(s.sticker_number, { owned: s.owned, dupes: s.dupes ?? 0 });
+        }
+        stickerMap.value = map;
+      }
     }
   } catch {
     console.error('Public profile request timed out');
@@ -204,6 +268,40 @@ function goToMyAlbum() {
           <div class="stat-num stat-num-coral">{{ stats.dupes }}</div>
           <div class="stat-lbl">REP.</div>
         </div>
+      </div>
+
+      <!-- MISSING / DUPES expandable lists -->
+      <div v-if="stickerMap.size > 0" class="lists">
+        <!-- Missing -->
+        <details v-if="stats.missing > 0" class="list-detail">
+          <summary class="list-summary">
+            <span>Faltan {{ stats.missing }}</span>
+            <button class="list-copy" @click.prevent="copyMissing">Copiar</button>
+          </summary>
+          <div class="list-body">
+            <div v-for="g in missingBySection" :key="g.section.id" class="list-group">
+              <div class="list-group-name">{{ g.section.name }}</div>
+              <div class="list-group-codes">{{ g.items.map((n) => codeForSticker(n)).join(', ') }}</div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Dupes -->
+        <details v-if="stats.dupes > 0" class="list-detail">
+          <summary class="list-summary">
+            <span>{{ stats.dupes }} repetidas</span>
+            <button class="list-copy" @click.prevent="copyDupes">Copiar</button>
+          </summary>
+          <div class="list-body">
+            <div v-for="g in dupesBySection" :key="g.section" class="list-group">
+              <div class="list-group-name">{{ g.section }}</div>
+              <div class="list-group-codes">{{ g.items.map((i) => `${i.code} (×${i.count})`).join(', ') }}</div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Copy toast -->
+        <div v-if="copied" class="list-toast">{{ copied }}</div>
       </div>
 
       <!-- CTA -->
@@ -449,6 +547,86 @@ function goToMyAlbum() {
   color: var(--ink-soft);
   letter-spacing: 0.15em;
   margin-top: 4px;
+}
+
+/* Expandable lists */
+.lists {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.list-detail {
+  border: 1px solid var(--paper-deep);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.list-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+.list-summary::-webkit-details-marker {
+  display: none;
+}
+.list-summary::before {
+  content: '▶';
+  font-size: 8px;
+  margin-right: 8px;
+  transition: transform 0.15s;
+}
+details[open] > .list-summary::before {
+  transform: rotate(90deg);
+}
+.list-copy {
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--gold-deep);
+  background: rgba(232, 179, 65, 0.12);
+  border: 1px solid rgba(232, 179, 65, 0.25);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.list-copy:hover {
+  background: rgba(232, 179, 65, 0.2);
+}
+.list-body {
+  padding: 0 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.list-group-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pitch);
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+.list-group-codes {
+  font-size: 11px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  word-break: break-word;
+}
+.list-toast {
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--gold-deep);
+  padding: 6px;
 }
 
 .cta {
