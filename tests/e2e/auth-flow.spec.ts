@@ -3,12 +3,13 @@ import { setupSupabaseRoutes, injectSession } from './fixtures/handlers';
 import { TEST_PROFILE } from './fixtures/data';
 
 test.describe('Auth Flow', () => {
-  test('redirects unauthenticated user from /album to /auth', async ({ page }) => {
+  test('unauthenticated user stays on /album in preview mode', async ({ page }) => {
     await setupSupabaseRoutes(page, { authenticated: false });
     await page.goto('/album');
 
-    await expect(page).toHaveURL(/\/auth$/);
-    await expect(page.locator('.google-btn')).toBeVisible();
+    await expect(page).toHaveURL(/\/album/);
+    // Preview banner should be visible instead of redirect
+    await expect(page.locator('.preview-banner')).toBeVisible();
   });
 
   test('shows login page with Google button', async ({ page }) => {

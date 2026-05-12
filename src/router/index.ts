@@ -29,7 +29,7 @@ const router = createRouter({
       path: '/album',
       name: 'album',
       component: () => import('@/views/AlbumView.vue'),
-      meta: { requiresAuth: true, requiresOnboarded: true },
+      meta: { requiresOnboarded: true },
     },
     {
       path: '/u/:username',

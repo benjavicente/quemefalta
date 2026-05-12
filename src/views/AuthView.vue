@@ -55,6 +55,8 @@ async function handleGoogleLogin() {
 
       <div v-if="error" class="error">{{ error }}</div>
 
+      <router-link to="/album" class="preview-btn">Explorar el álbum sin cuenta</router-link>
+
       <div class="foot">
         Solo guardamos tu email y nombre.<br />
         Cero spam, cero tracking.
@@ -155,6 +157,24 @@ async function handleGoogleLogin() {
   color: var(--red);
   font-size: 12px;
   font-weight: 500;
+}
+.preview-btn {
+  display: block;
+  margin-top: 12px;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--paper);
+  text-decoration: none;
+  background: var(--pitch);
+  border: none;
+  border-radius: 4px;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.preview-btn:hover {
+  opacity: 0.85;
 }
 .foot {
   margin-top: 22px;

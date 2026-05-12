@@ -139,9 +139,9 @@ describe('AlbumAccordion', () => {
       await w.findAll('.acc-group-head')[0].trigger('click');
       const teams = w.findAll('.acc-teams .acc-team');
 
-      // Click Ecuador (second team in group A)
+      // Click second team in group A (RSA)
       await teams[1].trigger('click');
-      expect(w.emitted('sectionChange')![0]).toEqual(['team-ecu']);
+      expect(w.emitted('sectionChange')![0]).toEqual(['team-rsa']);
     });
   });
 

@@ -69,7 +69,13 @@ const userInitial = computed(() => {
 onMounted(async () => {
   loading.value = true;
 
-  await ensureFreshSession();
+  // Only refresh session if user is logged in — anonymous users can view public profiles too
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (session) {
+    await ensureFreshSession();
+  }
 
   try {
     const { data, error } = await supabase

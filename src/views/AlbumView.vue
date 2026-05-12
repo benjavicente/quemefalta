@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, provide } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useStickers } from '@/composables/useStickers';
@@ -18,7 +18,9 @@ import CsvModal from '@/components/CsvModal.vue';
 import UndoToast from '@/components/UndoToast.vue';
 import OnboardingGuide from '@/components/OnboardingGuide.vue';
 
-const { profile, signOut } = useAuth();
+const { user, profile, signOut } = useAuth();
+const isPreview = computed(() => !user.value);
+provide('isPreview', isPreview);
 const {
   stickers,
   stats,
@@ -64,6 +66,7 @@ const showBatchInput = ref(false);
 const showScanner = ref(false);
 const showCsvModal = ref(false);
 const showProfileMenu = ref(false);
+const showLoginPrompt = ref(false);
 const sectionSearch = ref('');
 
 // Undo toast state
@@ -244,6 +247,10 @@ function handleDetailMark() {
 // Batch input handler
 async function handleBatchAdd(numbers: number[]) {
   showBatchInput.value = false;
+  if (isPreview.value) {
+    showLoginPrompt.value = true;
+    return;
+  }
   const count = await addBatch(numbers);
   if (count && count > 0) {
     undoToast.value = {
@@ -260,6 +267,10 @@ async function handleBatchAdd(numbers: number[]) {
 // Scanner handler — reuses the same toast logic
 async function handleScannerAdd(numbers: number[]) {
   showScanner.value = false;
+  if (isPreview.value) {
+    showLoginPrompt.value = true;
+    return;
+  }
   const count = await addBatch(numbers);
   if (count && count > 0) {
     undoToast.value = {
@@ -274,6 +285,10 @@ async function handleScannerAdd(numbers: number[]) {
 }
 
 function handleSectionOpenDetail(n: number) {
+  if (isPreview.value) {
+    showLoginPrompt.value = true;
+    return;
+  }
   detailFor.value = n;
   onFirstSticker();
 }
@@ -294,80 +309,85 @@ const userInitial = computed(() => {
         </div>
       </div>
       <div class="hdr-actions">
-        <button
-          class="hdr-icon-btn"
-          title="Compartir mi perfil"
-          aria-label="Compartir mi perfil"
-          @click="shareOpen = true"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <circle cx="18" cy="5" r="3" />
-            <circle cx="6" cy="12" r="3" />
-            <circle cx="18" cy="19" r="3" />
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-          </svg>
-        </button>
-        <button
-          class="hdr-icon-btn"
-          title="Tutorial de uso"
-          aria-label="Tutorial de uso"
-          @click="showOnboarding = true"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-        </button>
-        <!-- Profile button with dropdown -->
-        <div class="profile-wrap" @click.stop>
+        <template v-if="isPreview">
+          <button class="hdr-signup-btn" @click="router.push('/auth')">Crear cuenta</button>
+        </template>
+        <template v-else>
           <button
-            class="hdr-profile-btn"
-            aria-label="Menú de perfil"
-            @click="showProfileMenu = !showProfileMenu"
+            class="hdr-icon-btn"
+            title="Compartir mi perfil"
+            aria-label="Compartir mi perfil"
+            @click="shareOpen = true"
           >
-            <div v-if="profile?.avatar_url" class="hdr-avatar">
-              <img :src="profile.avatar_url" :alt="profile.display_name ?? ''" />
-            </div>
-            <div v-else class="hdr-avatar hdr-avatar-placeholder">{{ userInitial }}</div>
-          </button>
-          <div v-if="showProfileMenu" class="profile-menu">
-            <router-link v-if="profile?.username" class="pm-item" :to="`/u/${profile.username}`">
-              <span>Mi perfil</span>
-              <span class="pm-user">@{{ profile.username }}</span>
-            </router-link>
-            <button
-              class="pm-item"
-              @click="
-                showCsvModal = true;
-                showProfileMenu = false;
-              "
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
             >
-              Exportar / Importar CSV
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+          </button>
+          <button
+            class="hdr-icon-btn"
+            title="Tutorial de uso"
+            aria-label="Tutorial de uso"
+            @click="showOnboarding = true"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </button>
+          <!-- Profile button with dropdown -->
+          <div class="profile-wrap" @click.stop>
+            <button
+              class="hdr-profile-btn"
+              aria-label="Menú de perfil"
+              @click="showProfileMenu = !showProfileMenu"
+            >
+              <div v-if="profile?.avatar_url" class="hdr-avatar">
+                <img :src="profile.avatar_url" :alt="profile.display_name ?? ''" />
+              </div>
+              <div v-else class="hdr-avatar hdr-avatar-placeholder">{{ userInitial }}</div>
             </button>
-            <button class="pm-item pm-danger" @click="handleLogout">Cerrar sesión</button>
+            <div v-if="showProfileMenu" class="profile-menu">
+              <router-link v-if="profile?.username" class="pm-item" :to="`/u/${profile.username}`">
+                <span>Mi perfil</span>
+                <span class="pm-user">@{{ profile.username }}</span>
+              </router-link>
+              <button
+                class="pm-item"
+                @click="
+                  showCsvModal = true;
+                  showProfileMenu = false;
+                "
+              >
+                Exportar / Importar CSV
+              </button>
+              <button class="pm-item pm-danger" @click="handleLogout">Cerrar sesión</button>
+            </div>
           </div>
-        </div>
+        </template>
       </div>
     </header>
 
     <!-- SESSION DEAD POPUP -->
-    <div v-if="sessionDead" class="dead-bg">
+    <div v-if="sessionDead && !isPreview" class="dead-bg">
       <div class="dead-modal" role="alert">
         <div class="dead-icon">
           <svg
@@ -394,7 +414,7 @@ const userInitial = computed(() => {
     </div>
 
     <!-- SYNC ERROR (non-fatal) -->
-    <div v-if="syncError && !sessionDead" class="sync-error" role="alert">
+    <div v-if="syncError && !sessionDead && !isPreview" class="sync-error" role="alert">
       <svg
         width="14"
         height="14"
@@ -413,8 +433,15 @@ const userInitial = computed(() => {
       Error guardando: {{ syncError }}
     </div>
 
+    <!-- PREVIEW BANNER -->
+    <div v-if="isPreview" class="preview-banner">
+      <span>Modo preview — </span>
+      <router-link to="/auth" class="preview-link">Creá tu cuenta</router-link>
+      <span> para guardar tu progreso</span>
+    </div>
+
     <!-- LOADING -->
-    <div v-if="loading && !loaded" class="loading-state">
+    <div v-if="!isPreview && loading && !loaded" class="loading-state">
       <div class="loading-mark">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="var(--gold)" stroke="none">
           <polygon
@@ -477,7 +504,6 @@ const userInitial = computed(() => {
         <button :class="['tab', { on: view === 'calc' }]" @click="setView('calc')">
           Calculadora
         </button>
-        <!-- Scan button -->
         <button class="tab-scan" title="Escanear sobre" @click="showScanner = true">
           <svg
             width="14"
@@ -630,6 +656,23 @@ const userInitial = computed(() => {
 
     <!-- ONBOARDING GUIDE -->
     <OnboardingGuide v-if="showOnboarding" @done="showOnboarding = false" />
+
+    <!-- LOGIN PROMPT (preview mode) -->
+    <Teleport to="body">
+      <div v-if="showLoginPrompt" class="login-prompt-bg" @click.self="showLoginPrompt = false">
+        <div class="login-prompt">
+          <div class="login-prompt-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2">
+              <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+            </svg>
+          </div>
+          <div class="login-prompt-title">Creá tu cuenta</div>
+          <p class="login-prompt-text">Para marcar láminas, escanear sobres y llevar tu progreso necesitás una cuenta.</p>
+          <button class="login-prompt-btn" @click="router.push('/auth')">Crear cuenta con Google</button>
+          <button class="login-prompt-dismiss" @click="showLoginPrompt = false">Seguir mirando</button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -960,17 +1003,16 @@ const userInitial = computed(() => {
 /* TABS */
 .tabs {
   display: flex;
-  padding: 0 clamp(14px, 3vw, 28px);
+  padding: 0 clamp(8px, 2vw, 28px);
   border-bottom: 1px solid var(--line);
-  overflow-x: auto;
   align-items: center;
+  flex-wrap: nowrap;
 }
 .tab {
-  padding: 13px clamp(10px, 2vw, 18px);
-  margin-right: 4px;
-  font-size: clamp(10px, 1.4vw, 12px);
+  padding: 13px clamp(6px, 1.5vw, 18px);
+  font-size: clamp(9px, 1.3vw, 12px);
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: rgba(246, 241, 225, 0.5);
   border: none;
@@ -980,6 +1022,8 @@ const userInitial = computed(() => {
   background: none;
   cursor: pointer;
   font-family: inherit;
+  flex-shrink: 1;
+  min-width: 0;
 }
 .tab.on {
   color: var(--gold);
@@ -987,8 +1031,8 @@ const userInitial = computed(() => {
 }
 .tab-scan {
   margin-left: auto;
-  width: 32px;
-  height: 32px;
+  width: clamp(28px, 4vw, 32px);
+  height: clamp(28px, 4vw, 32px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1005,8 +1049,8 @@ const userInitial = computed(() => {
 }
 .tab-add {
   margin-left: 0;
-  padding: 7px 14px;
-  font-size: 11px;
+  padding: 7px clamp(8px, 1.5vw, 14px);
+  font-size: clamp(9px, 1.3vw, 11px);
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--gold);
@@ -1266,5 +1310,107 @@ const userInitial = computed(() => {
 .collapse-back-btn:hover {
   color: var(--chalk);
   border-color: var(--chalk);
+}
+
+/* PREVIEW BANNER */
+.preview-banner {
+  padding: 10px clamp(14px, 3vw, 28px);
+  background: rgba(232, 179, 65, 0.1);
+  border-bottom: 1px solid rgba(232, 179, 65, 0.25);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  text-align: center;
+}
+.preview-link {
+  color: var(--gold);
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+/* HEADER SIGNUP BUTTON */
+.hdr-signup-btn {
+  padding: 8px 16px;
+  background: var(--gold);
+  color: var(--pitch-deep);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.hdr-signup-btn:hover {
+  opacity: 0.9;
+}
+
+/* LOGIN PROMPT MODAL */
+.login-prompt-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 18, 32, 0.8);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 20px;
+}
+.login-prompt {
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 14px;
+  padding: 28px 24px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+}
+.login-prompt-icon {
+  margin-bottom: 12px;
+}
+.login-prompt-title {
+  font-family: var(--display);
+  font-size: 24px;
+  letter-spacing: 0.06em;
+  color: var(--pitch);
+  margin-bottom: 8px;
+}
+.login-prompt-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0 0 20px;
+}
+.login-prompt-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--gold);
+  color: var(--pitch-deep);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.login-prompt-btn:hover {
+  opacity: 0.9;
+}
+.login-prompt-dismiss {
+  display: block;
+  margin: 12px auto 0;
+  padding: 8px;
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.login-prompt-dismiss:hover {
+  color: var(--ink);
 }
 </style>
