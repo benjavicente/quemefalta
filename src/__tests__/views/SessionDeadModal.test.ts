@@ -92,7 +92,9 @@ describe('Session Dead Modal', () => {
 
     expect(wrapper.find('.dead-bg').exists()).toBe(true);
     expect(wrapper.find('.dead-title').text()).toBe('SESIÓN EXPIRADA');
-    expect(wrapper.find('.dead-btn').text()).toBe('Recargar página');
+    const buttons = wrapper.findAll('.dead-btn');
+    expect(buttons[0].text()).toBe('Reintentar');
+    expect(buttons[buttons.length - 1].text()).toBe('Recargar página');
   });
 
   it('shows sync error banner for non-fatal errors when session is alive', async () => {

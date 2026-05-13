@@ -62,6 +62,9 @@ export const ensureFreshSession = vi.fn().mockResolvedValue(true);
 // withAuthRetry: by default, just execute the fn directly (transparent pass-through)
 export const withAuthRetry = vi.fn().mockImplementation(async (fn: () => Promise<any>) => fn());
 
+// tryRescueSession: by default resolves true (rescue succeeded)
+export const tryRescueSession = vi.fn().mockResolvedValue(true);
+
 // sessionDead: reactive ref for tests
 import { ref, readonly } from 'vue';
 const _sessionDead = ref(false);
@@ -97,6 +100,9 @@ export function resetSupabaseMock() {
 
   withAuthRetry.mockClear();
   withAuthRetry.mockImplementation(async (fn: () => Promise<any>) => fn());
+
+  tryRescueSession.mockClear();
+  tryRescueSession.mockResolvedValue(true);
 
   _sessionDead.value = false;
 }

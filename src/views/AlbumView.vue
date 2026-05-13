@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, provide } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useStickers } from '@/composables/useStickers';
+import { tryRescueSession } from '@/lib/supabase';
 import { useMeta } from '@/composables/useMeta';
 import { ALBUM_SECTIONS, TOTAL_STICKERS, sectionForSticker, codeForSticker } from '@/lib/albumData';
 import { pctColor } from '@/lib/progressColors';
@@ -42,7 +43,13 @@ const router = useRouter();
 // Leer estado inicial del hash de la URL
 const rawHash = route.hash.replace('#', '');
 const initialView: 'album' | 'missing' | 'dupes' | 'calc' =
-  rawHash === 'missing' ? 'missing' : rawHash === 'dupes' ? 'dupes' : rawHash === 'calc' ? 'calc' : 'album';
+  rawHash === 'missing'
+    ? 'missing'
+    : rawHash === 'dupes'
+      ? 'dupes'
+      : rawHash === 'calc'
+        ? 'calc'
+        : 'album';
 const initialSection = ALBUM_SECTIONS.find((s) => s.id === rawHash)?.id ?? ALBUM_SECTIONS[0].id;
 
 const activeSection = ref(initialSection);
@@ -58,6 +65,16 @@ function setView(v: 'album' | 'missing' | 'dupes' | 'calc') {
   }
 }
 const reloadPage = () => location.reload();
+const rescuing = ref(false);
+const rescueFailed = ref(false);
+async function handleRescue() {
+  if (rescuing.value) return;
+  rescuing.value = true;
+  rescueFailed.value = false;
+  const ok = await tryRescueSession();
+  rescuing.value = false;
+  if (!ok) rescueFailed.value = true;
+}
 const accordionRef = ref<InstanceType<typeof AlbumAccordion> | null>(null);
 const progressRef = ref<HTMLElement | null>(null);
 const detailFor = ref<number | null>(null);
@@ -407,9 +424,14 @@ const userInitial = computed(() => {
         </div>
         <div class="dead-title">SESIÓN EXPIRADA</div>
         <p class="dead-text">
-          Tus últimos cambios no se guardaron. Recarga la página para reconectar con el servidor.
+          Tus últimos cambios no se guardaron.
+          <span v-if="rescueFailed"> No pudimos reconectar — recarga la página.</span>
+          <span v-else> Probemos reconectar sin perder el estado.</span>
         </p>
-        <button class="dead-btn" @click="reloadPage">Recargar página</button>
+        <button v-if="!rescueFailed" class="dead-btn" :disabled="rescuing" @click="handleRescue">
+          {{ rescuing ? 'Reconectando...' : 'Reintentar' }}
+        </button>
+        <button class="dead-btn dead-btn-secondary" @click="reloadPage">Recargar página</button>
       </div>
     </div>
 
@@ -662,14 +684,29 @@ const userInitial = computed(() => {
       <div v-if="showLoginPrompt" class="login-prompt-bg" @click.self="showLoginPrompt = false">
         <div class="login-prompt">
           <div class="login-prompt-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2">
-              <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--gold)"
+              stroke-width="2"
+            >
+              <polygon
+                points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+              />
             </svg>
           </div>
           <div class="login-prompt-title">Crea tu cuenta</div>
-          <p class="login-prompt-text">Para marcar láminas, escanear sobres y llevar tu progreso necesitas una cuenta.</p>
-          <button class="login-prompt-btn" @click="router.push('/auth')">Crear cuenta con Google</button>
-          <button class="login-prompt-dismiss" @click="showLoginPrompt = false">Seguir mirando</button>
+          <p class="login-prompt-text">
+            Para marcar láminas, escanear sobres y llevar tu progreso necesitas una cuenta.
+          </p>
+          <button class="login-prompt-btn" @click="router.push('/auth')">
+            Crear cuenta con Google
+          </button>
+          <button class="login-prompt-dismiss" @click="showLoginPrompt = false">
+            Seguir mirando
+          </button>
         </div>
       </div>
     </Teleport>
@@ -878,6 +915,20 @@ const userInitial = computed(() => {
 }
 .dead-btn:hover {
   opacity: 0.9;
+}
+.dead-btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.dead-btn-secondary {
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  margin-top: 8px;
+}
+.dead-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 1;
 }
 
 /* SYNC ERROR */
