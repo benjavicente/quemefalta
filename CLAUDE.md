@@ -64,7 +64,8 @@ AlbumView.vue ─── Vista principal, orquesta todo
 ├── ConfirmDialog.vue ← Diálogo de confirmación genérico
 └── UndoToast.vue ← Toast con undo
 
-PublicProfileView.vue ← Perfil público /u/:username (read-only)
+PublicProfileView.vue ← Perfil público /u/:username (read-only, entry point a intercambio)
+ExchangeView.vue ← Comparación de intercambio /intercambio/:userA/:userB (público)
 AuthView.vue ← Login con Google
 AuthCallbackView.vue ← Callback OAuth
 OnboardingView.vue ← Elegir username
@@ -107,6 +108,7 @@ OnboardingView.vue ← Elegir username
 | `src/lib/fwcConfig.ts` | Config de layout FWC intro (variantes h/v, imágenes por sticker) |
 | `src/lib/calcUtils.ts` | Calculadora de sobres: expectedNew, simulateWithTrade, projectionTable, projectionCurves |
 | `src/lib/csvUtils.ts` | Export/import CSV grilla 49×20: generateCsv, parseCsv |
+| `src/lib/exchangeUtils.ts` | Algoritmo de intercambio: `computeExchange`, `formatExchangeList` — lógica pura, sin Vue |
 | `src/lib/mockClient.ts` | Mock Supabase para `dev:mock` (query builder chainable, auth fake, persistence JSON) |
 
 ## Composables
@@ -118,6 +120,7 @@ OnboardingView.vue ← Elegir username
 | `useShare` | Generar link de perfil público |
 | `useMeta` | Meta tags dinámicos (title, OG, Twitter) — reactivo con refs |
 | `useUndo` | Stack de undo con timeout auto-dismiss |
+| `useExchange` | Fetch paralelo de 2 perfiles públicos + computar intercambio de láminas |
 
 ## Convenciones
 
