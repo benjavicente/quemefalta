@@ -325,6 +325,26 @@ function compareWithOther() {
         <button v-if="isOwnProfile" class="cta-btn" @click="router.push('/album')">
           Volver a mi álbum
         </button>
+        <!-- Compare (own profile) -->
+        <div v-if="isOwnProfile" class="compare-row">
+          <button
+            v-if="!showCompareInput"
+            class="compare-link"
+            @click="showCompareInput = true"
+          >
+            Comparar con otro perfil
+          </button>
+          <form v-else class="compare-form" @submit.prevent="compareWithOther">
+            <input
+              v-model="compareInput"
+              class="compare-input"
+              placeholder="@username"
+              autocomplete="off"
+              autocapitalize="off"
+            />
+            <button type="submit" class="compare-go" :disabled="!compareInput.trim()">Comparar</button>
+          </form>
+        </div>
         <template v-else>
           <button class="cta-btn" @click="goToMyAlbum">
             {{ user ? 'Ver mi álbum' : 'Crear mi álbum' }}
