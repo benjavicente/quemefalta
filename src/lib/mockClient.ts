@@ -69,6 +69,41 @@ function saveDb() {
   }).catch(() => {});
 }
 
+// ── Virtual views (derived from base tables, like Supabase views) ──
+function buildPublicAlbumStats(): Row[] {
+  return db.profiles
+    .filter((p) => p.is_public)
+    .map((p) => {
+      const userStickers = db.stickers.filter((s) => s.user_id === p.id && s.owned);
+      return {
+        id: p.id,
+        username: p.username,
+        display_name: p.display_name,
+        avatar_url: p.avatar_url,
+        owned_count: userStickers.length,
+        dupes_count: userStickers.reduce((sum: number, s: any) => sum + (s.dupes ?? 0), 0),
+      };
+    });
+}
+
+function buildPublicUserStickers(): Row[] {
+  const publicIds = new Set(db.profiles.filter((p) => p.is_public).map((p) => p.id));
+  const usernameById = new Map(db.profiles.map((p) => [p.id, p.username]));
+  return db.stickers
+    .filter((s) => publicIds.has(s.user_id))
+    .map((s) => ({
+      username: usernameById.get(s.user_id),
+      sticker_number: s.sticker_number,
+      owned: s.owned ?? false,
+      dupes: s.dupes ?? 0,
+    }));
+}
+
+const VIRTUAL_TABLES: Record<string, () => Row[]> = {
+  public_album_stats: buildPublicAlbumStats,
+  public_user_stickers: buildPublicUserStickers,
+};
+
 // ── Query builder ──
 type Row = Record<string, any>;
 
@@ -88,6 +123,7 @@ class MockQueryBuilder {
   }
 
   private getTable(): Row[] {
+    if (this.table in VIRTUAL_TABLES) return VIRTUAL_TABLES[this.table]();
     return (db as any)[this.table] ?? [];
   }
 
