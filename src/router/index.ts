@@ -37,6 +37,12 @@ const router = createRouter({
       component: () => import('@/views/PublicProfileView.vue'),
       meta: { isPublic: true },
     },
+    {
+      path: '/intercambio/:userA/:userB',
+      name: 'exchange',
+      component: () => import('@/views/ExchangeView.vue'),
+      meta: { isPublic: true },
+    },
   ],
 });
 

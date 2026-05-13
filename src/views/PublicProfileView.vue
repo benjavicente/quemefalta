@@ -17,7 +17,7 @@ interface PublicProfile {
 
 const route = useRoute();
 const router = useRouter();
-const { user } = useAuth();
+const { user, profile: myProfile } = useAuth();
 
 const profile = ref<PublicProfile | null>(null);
 const loading = ref(true);
@@ -164,11 +164,27 @@ onMounted(async () => {
   loading.value = false;
 });
 
+const compareInput = ref('');
+const showCompareInput = ref(false);
+
 function goToMyAlbum() {
   if (user.value) {
     router.push('/album');
   } else {
     router.push('/auth');
+  }
+}
+
+function compareWithMe() {
+  if (myProfile.value?.username && profile.value) {
+    router.push(`/intercambio/${profile.value.username}/${myProfile.value.username}`);
+  }
+}
+
+function compareWithOther() {
+  const other = compareInput.value.trim().replace(/^@/, '');
+  if (other && profile.value && other !== profile.value.username) {
+    router.push(`/intercambio/${profile.value.username}/${other}`);
   }
 }
 </script>
@@ -313,8 +329,35 @@ function goToMyAlbum() {
           <button class="cta-btn" @click="goToMyAlbum">
             {{ user ? 'Ver mi álbum' : 'Crear mi álbum' }}
           </button>
-          <div class="cta-sub">
-            ¿Tienes láminas que cambiar con {{ firstName }}? Contáctalo directo.
+
+          <!-- Compare with logged-in user -->
+          <button
+            v-if="myProfile?.username && myProfile.username !== profile.username"
+            class="compare-btn"
+            @click="compareWithMe"
+          >
+            Comparar con mi álbum
+          </button>
+
+          <!-- Compare with another user -->
+          <div class="compare-row">
+            <button
+              v-if="!showCompareInput"
+              class="compare-link"
+              @click="showCompareInput = true"
+            >
+              Comparar con otro perfil
+            </button>
+            <form v-else class="compare-form" @submit.prevent="compareWithOther">
+              <input
+                v-model="compareInput"
+                class="compare-input"
+                placeholder="@username"
+                autocomplete="off"
+                autocapitalize="off"
+              />
+              <button type="submit" class="compare-go" :disabled="!compareInput.trim()">Comparar</button>
+            </form>
           </div>
         </template>
       </div>
@@ -656,6 +699,65 @@ details[open] > .list-summary::before {
   line-height: 1.6;
   margin-top: 12px;
 }
+
+.compare-btn {
+  width: 100%;
+  padding: 12px 0;
+  margin-top: 8px;
+  background: transparent;
+  border: 1.5px solid var(--gold);
+  color: var(--gold-deep);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.compare-btn:hover { background: rgba(232,179,65,0.08); }
+
+.compare-row {
+  margin-top: 10px;
+  text-align: center;
+}
+.compare-link {
+  background: none;
+  border: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.compare-link:hover { color: var(--pitch); }
+.compare-form {
+  display: flex;
+  gap: 6px;
+}
+.compare-input {
+  flex: 1;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--paper);
+  border: 1.5px solid var(--paper-deep);
+  border-radius: 6px;
+  color: var(--pitch);
+}
+.compare-input::placeholder { color: var(--ink-soft); }
+.compare-go {
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--gold);
+  color: var(--pitch-deep);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.compare-go:disabled { opacity: 0.4; cursor: default; }
 
 .footer {
   text-align: center;

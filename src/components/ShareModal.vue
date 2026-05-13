@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useShare } from '@/composables/useShare';
 import type { Profile } from '@/types/app';
 
@@ -22,7 +23,10 @@ const {
   openExternalUrl,
 } = useShare();
 
+const router = useRouter();
 const justCopied = ref(false);
+const showCompare = ref(false);
+const compareUser = ref('');
 
 const url = computed(() => {
   return `${globalThis.location.origin}/u/${props.profile.username}`;
@@ -72,6 +76,13 @@ async function openLinkedInShare() {
 
 function viewPublic() {
   globalThis.open(url.value, '_blank');
+}
+
+function goCompare() {
+  const other = compareUser.value.trim().replace(/^@/, '');
+  if (other && other !== props.profile.username) {
+    router.push(`/intercambio/${props.profile.username}/${other}`);
+  }
 }
 </script>
 
@@ -141,6 +152,21 @@ function viewPublic() {
       </div>
 
       <button class="preview-btn" @click="viewPublic">👁 Ver cómo se ve mi perfil público</button>
+
+      <!-- Compare with someone -->
+      <button v-if="!showCompare" class="preview-btn" @click="showCompare = true">
+        Comparar con otro perfil
+      </button>
+      <form v-else class="compare-form" @submit.prevent="goCompare">
+        <input
+          v-model="compareUser"
+          class="compare-input"
+          placeholder="@username del otro"
+          autocomplete="off"
+          autocapitalize="off"
+        />
+        <button type="submit" class="compare-go" :disabled="!compareUser.trim()">Ir</button>
+      </form>
 
       <button class="close-btn" @click="$emit('close')">CERRAR</button>
     </div>
@@ -314,6 +340,35 @@ function viewPublic() {
 .preview-btn:hover {
   background: rgba(0, 0, 0, 0.03);
 }
+
+.compare-form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.compare-input {
+  flex: 1;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--paper);
+  border: 1.5px solid var(--paper-deep);
+  border-radius: 6px;
+  color: var(--pitch);
+}
+.compare-input::placeholder { color: var(--ink-soft); }
+.compare-go {
+  padding: 10px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--gold);
+  color: var(--pitch-deep);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.compare-go:disabled { opacity: 0.4; cursor: default; }
 
 .close-btn {
   width: 100%;
