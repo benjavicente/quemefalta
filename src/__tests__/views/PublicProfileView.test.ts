@@ -5,7 +5,15 @@ import { ref, computed } from 'vue';
 import * as mockSupabase from '../mocks/supabase';
 import { createUser } from '../mocks/factories';
 
-const { setQueryResult, resetSupabaseMock } = mockSupabase;
+const { setQueryResult, setQueryResultForTable, resetSupabaseMock } = mockSupabase;
+
+// Helper: setea el resultado del fetch del profile (public_album_stats) y el
+// de stickers (public_user_stickers) en una sola llamada. La vista hace ambas
+// queries en serie y necesita shape distinto para cada una.
+function setProfileAndStickers(profile: any, stickers: any[] = []) {
+  setQueryResultForTable('public_album_stats', { data: profile, error: null });
+  setQueryResultForTable('public_user_stickers', { data: stickers, error: null });
+}
 
 const mockPush = vi.fn();
 const mockUserRef = ref<any>(null);
@@ -49,16 +57,13 @@ describe('PublicProfileView', () => {
   });
 
   it('renders profile card when data is found', async () => {
-    setQueryResult({
-      data: {
-        id: 'other-user',
-        username: 'pedro42',
-        display_name: 'Pedro García',
-        avatar_url: 'https://example.com/avatar.jpg',
-        owned_count: 200,
-        dupes_count: 15,
-      },
-      error: null,
+    setProfileAndStickers({
+      id: 'other-user',
+      username: 'pedro42',
+      display_name: 'Pedro García',
+      avatar_url: 'https://example.com/avatar.jpg',
+      owned_count: 200,
+      dupes_count: 15,
     });
 
     const w = mount(PublicProfileView);
@@ -91,16 +96,13 @@ describe('PublicProfileView', () => {
   it('shows "Crear mi cuenta" CTA when not authenticated', async () => {
     mockUserRef.value = null;
 
-    setQueryResult({
-      data: {
-        id: 'other-user',
-        username: 'pedro42',
-        display_name: 'Pedro',
-        avatar_url: null,
-        owned_count: 100,
-        dupes_count: 5,
-      },
-      error: null,
+    setProfileAndStickers({
+      id: 'other-user',
+      username: 'pedro42',
+      display_name: 'Pedro',
+      avatar_url: null,
+      owned_count: 100,
+      dupes_count: 5,
     });
 
     const w = mount(PublicProfileView);
@@ -113,16 +115,13 @@ describe('PublicProfileView', () => {
   it('shows "Ver mi álbum" CTA when authenticated but viewing other profile', async () => {
     mockUserRef.value = createUser({ id: 'my-user-id' });
 
-    setQueryResult({
-      data: {
-        id: 'other-user',
-        username: 'pedro42',
-        display_name: 'Pedro',
-        avatar_url: null,
-        owned_count: 100,
-        dupes_count: 5,
-      },
-      error: null,
+    setProfileAndStickers({
+      id: 'other-user',
+      username: 'pedro42',
+      display_name: 'Pedro',
+      avatar_url: null,
+      owned_count: 100,
+      dupes_count: 5,
     });
 
     const w = mount(PublicProfileView);
@@ -133,16 +132,13 @@ describe('PublicProfileView', () => {
   });
 
   it('computes stats correctly', async () => {
-    setQueryResult({
-      data: {
-        id: 'other-user',
-        username: 'pedro42',
-        display_name: 'Pedro',
-        avatar_url: null,
-        owned_count: 490,
-        dupes_count: 25,
-      },
-      error: null,
+    setProfileAndStickers({
+      id: 'other-user',
+      username: 'pedro42',
+      display_name: 'Pedro',
+      avatar_url: null,
+      owned_count: 490,
+      dupes_count: 25,
     });
 
     const w = mount(PublicProfileView);

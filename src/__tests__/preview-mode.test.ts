@@ -16,7 +16,10 @@ vi.mock('@/composables/useAuth', () => ({
     loading: ref(false),
     isAuthenticated: computed(() => !!mockUser.value),
     needsOnboarding: computed(
-      () => !!mockUser.value && !!mockProfile.value && !(mockProfile.value as Record<string, unknown>).onboarded,
+      () =>
+        !!mockUser.value &&
+        !!mockProfile.value &&
+        !(mockProfile.value as Record<string, unknown>).onboarded,
     ),
     init: vi.fn().mockResolvedValue(undefined),
     signInWithGoogle: vi.fn(),
@@ -32,8 +35,15 @@ vi.mock('@/composables/useStickers', () => ({
     loaded: ref(true),
     syncError: ref(null),
     sessionDead: ref(false),
+    pendingOps: ref(new Map()),
+    pendingCount: computed(() => 0),
+    failedCount: computed(() => 0),
     stats: computed(() => ({ owned: 0, missing: 980, dupes: 0, pct: 0, withNotes: 0 })),
     getSticker: (_n: number): StickerState => ({ owned: false, dupes: 0, note: '' }),
+    getStickerSyncStatus: () => null,
+    retryAllPending: vi.fn(),
+    discardAllPending: vi.fn(),
+    discardOne: vi.fn(),
     cycleSticker: vi.fn(),
     decrementSticker: vi.fn(),
     markSectionComplete: vi.fn(),

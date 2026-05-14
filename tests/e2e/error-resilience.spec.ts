@@ -46,8 +46,15 @@ test.describe('Error Resilience', () => {
           },
         },
         authRefreshError: {
-          status: 401,
-          body: { error: 'invalid_grant', error_description: 'Token expired' },
+          // Production marks sessionDead only on PERMANENT refresh errors (see
+          // PERMANENT_REFRESH_MESSAGES in src/lib/supabase.ts). The error_description
+          // is what auth-js surfaces as error.message, so it must include one of
+          // those phrases for isPermanentAuthError() to trip.
+          status: 400,
+          body: {
+            error: 'invalid_grant',
+            error_description: 'Invalid Refresh Token: Refresh Token Not Found.',
+          },
         },
       });
       await injectSession(page);
@@ -61,12 +68,17 @@ test.describe('Error Resilience', () => {
       // Session dead popup should appear
       await expect(page.locator('.dead-modal')).toBeVisible({ timeout: 15000 });
       await expect(page.locator('.dead-title')).toContainText('SESIÓN EXPIRADA');
-      await expect(page.locator('.dead-btn')).toContainText('Recargar página');
+      await expect(page.locator('.dead-btn-secondary')).toContainText('Recargar página');
     });
   });
 
-  test.describe('500 — server error shows sync error and reverts', () => {
-    test('500 on sticker POST shows sync-error banner', async ({ page }) => {
+  test.describe('500 — server error: sticker queues for retry, no revert', () => {
+    test('500 on sticker POST queues op, optimistic stays, sync-status banner shows', async ({
+      page,
+    }) => {
+      // Nueva politica: en error transitorio del servidor, el sticker queda
+      // marcado (optimistic) y la op va a la sync queue para retry. El usuario
+      // ve el banner `.sync-status` (pending o failed), no `.sync-error`.
       await setupSupabaseRoutes(page, {
         authenticated: true,
         profile: TEST_PROFILE,
@@ -84,11 +96,14 @@ test.describe('Error Resilience', () => {
       const firstSticker = page.locator('.stk').first();
       await firstSticker.click();
 
-      // Sync error banner appears
-      await expect(page.locator('.sync-error')).toBeVisible({ timeout: 5000 });
+      // Sticker se mantiene marcado (no revierte)
+      await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 5000 });
 
-      // Sticker reverts to not-owned
-      await expect(firstSticker).not.toHaveClass(/stk-owned/, { timeout: 5000 });
+      // El banner de sync queue aparece (pending o failed)
+      await expect(page.locator('.sync-status')).toBeVisible({ timeout: 15000 });
+
+      // Indicador de sync en la lamina (pending o failed)
+      await expect(firstSticker.locator('.stk-sync-dot')).toBeVisible({ timeout: 5000 });
     });
 
     test('500 on section complete reverts all stickers', async ({ page }) => {
@@ -111,7 +126,9 @@ test.describe('Error Resilience', () => {
 
       // Should show error and revert
       await expect(page.locator('.sync-error')).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('.acc-team-count').first()).toContainText('0/20', { timeout: 5000 });
+      await expect(page.locator('.acc-team-count').first()).toContainText('0/20', {
+        timeout: 5000,
+      });
     });
 
     test('500 on initial sticker load shows sync error', async ({ page }) => {
@@ -155,7 +172,12 @@ test.describe('Error Resilience', () => {
   });
 
   test.describe('Offline — no network', () => {
-    test('going offline after load shows error on sticker action', async ({ page, context }) => {
+    test('going offline after load: sticker queues for retry, no revert', async ({
+      page,
+      context,
+    }) => {
+      // Nueva politica: offline durante una accion → la op va a la queue de
+      // sync, el sticker queda marcado y aparece el banner `.sync-status`.
       await setupSupabaseRoutes(page, {
         authenticated: true,
         profile: TEST_PROFILE,
@@ -167,21 +189,24 @@ test.describe('Error Resilience', () => {
       await page.locator('.acc-team').first().click();
       await expect(page.locator('.stk').first()).toBeVisible();
 
-      // Remove all route handlers, then go offline so requests actually fail
+      // Quitar route handlers y poner offline → los requests fallan de verdad.
       await page.unrouteAll();
       await context.setOffline(true);
 
       const firstSticker = page.locator('.stk').first();
       await firstSticker.click();
 
-      // Should show sync error (network request fails)
-      await expect(page.locator('.sync-error')).toBeVisible({ timeout: 10000 });
+      // Optimistic stays — el sticker no revierte.
+      await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 5000 });
 
-      // Sticker should revert
-      await expect(firstSticker).not.toHaveClass(/stk-owned/, { timeout: 5000 });
+      // Banner de sync queue aparece.
+      await expect(page.locator('.sync-status')).toBeVisible({ timeout: 15000 });
     });
 
-    test('sticker reverts to unowned after offline error', async ({ page, context }) => {
+    test('offline error: sticker keeps optimistic + pending sync indicator', async ({
+      page,
+      context,
+    }) => {
       await setupSupabaseRoutes(page, {
         authenticated: true,
         profile: TEST_PROFILE,
@@ -193,16 +218,15 @@ test.describe('Error Resilience', () => {
       await page.locator('.acc-team').first().click();
       await expect(page.locator('.stk').first()).toBeVisible();
 
-      // Remove route handlers and go offline so requests actually fail
       await page.unrouteAll();
       await context.setOffline(true);
 
       const firstSticker = page.locator('.stk').first();
       await firstSticker.click();
 
-      // Should show sync error and revert sticker
-      await expect(page.locator('.sync-error')).toBeVisible({ timeout: 10000 });
-      await expect(firstSticker).not.toHaveClass(/stk-owned/, { timeout: 5000 });
+      // Sticker queda marcado con indicador de pendiente.
+      await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 5000 });
+      await expect(firstSticker.locator('.stk-sync-dot')).toBeVisible({ timeout: 5000 });
     });
   });
 });

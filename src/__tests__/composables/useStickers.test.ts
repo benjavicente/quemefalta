@@ -14,6 +14,14 @@ beforeEach(async () => {
   vi.resetModules();
   resetSupabaseMock();
 
+  // Limpiar la sync queue persistida — tests no deben heredar ops pendientes
+  // de tests anteriores que simularon errores.
+  try {
+    localStorage.clear();
+  } catch {
+    // jsdom puede no tener localStorage en algunos entornos
+  }
+
   // Mock supabase
   vi.doMock('@/lib/supabase', () => mockSupabase);
 
@@ -148,16 +156,14 @@ describe('useStickers', () => {
   });
 
   describe('optimistic updates', () => {
-    it('reverts on upsert error', async () => {
-      setQueryResult({
-        data: [],
-        error: null,
-      });
+    it('enqueues on upsert error — optimistic stays, no syncError banner', async () => {
+      // Nueva politica: errors transitorios no revierten ni muestran banner.
+      // La op se mete en la sync queue y se reintenta en background.
+      setQueryResult({ data: [], error: null });
 
-      const { stickers, cycleSticker, loaded, syncError } = useStickers();
+      const { stickers, cycleSticker, loaded, syncError, pendingOps } = useStickers();
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
-      // Set up the upsert to fail
       setQueryResult({
         data: null,
         error: { message: 'Upsert failed' },
@@ -166,9 +172,12 @@ describe('useStickers', () => {
       cycleSticker(42);
       await flushPromises();
 
-      // Should revert since upsert failed
-      expect(syncError.value).toBe('Upsert failed');
-      expect(stickers.value[42]).toBeUndefined();
+      // Optimistic se mantiene (sticker queda marcado)
+      expect(stickers.value[42]?.owned).toBe(true);
+      // No mostramos banner amarillo de syncError — la queue tiene su propio banner
+      expect(syncError.value).toBeNull();
+      // La op esta en la queue con el error capturado
+      expect(pendingOps.value.get(42)?.lastError).toBe('Upsert failed');
     });
   });
 
@@ -436,13 +445,14 @@ describe('useStickers', () => {
       expect(mockSupabase.withAuthRetry).toHaveBeenCalled();
     });
 
-    it('reverts optimistic update when withAuthRetry returns error', async () => {
+    it('enqueues op when withAuthRetry returns error — optimistic stays', async () => {
+      // Nueva politica: en lugar de revertir, el sticker queda marcado y la op
+      // se mete en la sync queue para retry en background.
       setQueryResult({ data: [], error: null });
 
-      const { stickers, cycleSticker, loaded, syncError } = useStickers();
+      const { stickers, cycleSticker, loaded, pendingOps, pendingCount } = useStickers();
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
-      // Make withAuthRetry return an auth error (simulating all retries exhausted)
       mockSupabase.withAuthRetry.mockResolvedValueOnce({
         data: null,
         error: { message: 'JWT expired', code: '401' },
@@ -451,8 +461,12 @@ describe('useStickers', () => {
       cycleSticker(42);
       await flushPromises();
 
-      expect(stickers.value[42]).toBeUndefined();
-      expect(syncError.value).toBe('JWT expired');
+      // Optimistic se mantiene
+      expect(stickers.value[42]?.owned).toBe(true);
+      // Y la op queda en la queue como pending para retry
+      expect(pendingCount.value).toBe(1);
+      expect(pendingOps.value.get(42)?.lastError).toBe('JWT expired');
+      expect(pendingOps.value.get(42)?.status).toBe('pending');
     });
 
     it('blocks writes when sessionDead is true via ensureFreshSession', async () => {
@@ -705,7 +719,10 @@ describe('useStickers', () => {
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
       setQueryResult({ data: null, error: { message: 'Import failed' } });
-      const data = new Map([[1, 1], [2, 2]]);
+      const data = new Map([
+        [1, 1],
+        [2, 2],
+      ]);
       await importBulk(data, 'merge');
 
       expect(syncError.value).toBe('Import failed');
@@ -733,7 +750,11 @@ describe('useStickers', () => {
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
       setQueryResult({ data: null, error: null });
-      const data = new Map([[0, 1], [981, 1], [5, 1]]);
+      const data = new Map([
+        [0, 1],
+        [981, 1],
+        [5, 1],
+      ]);
       const changed = await importBulk(data, 'merge');
 
       expect(changed).toBe(1); // only sticker 5

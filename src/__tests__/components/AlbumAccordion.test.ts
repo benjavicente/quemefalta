@@ -17,9 +17,16 @@ vi.mock('@/composables/useStickers', () => ({
     loaded: ref(true),
     syncError: ref(null),
     sessionDead: ref(false),
+    pendingOps: ref(new Map()),
+    pendingCount: computed(() => 0),
+    failedCount: computed(() => 0),
     stats: computed(() => ({ owned: 0, missing: 980, dupes: 0, pct: 0, withNotes: 0 })),
     getSticker: (n: number): StickerState =>
       mockStickersData[n] ?? { owned: false, dupes: 0, note: '' },
+    getStickerSyncStatus: () => null,
+    retryAllPending: vi.fn(),
+    discardAllPending: vi.fn(),
+    discardOne: vi.fn(),
     cycleSticker: vi.fn(),
     markSectionComplete: vi.fn(),
     clearSection: vi.fn(),
@@ -28,6 +35,7 @@ vi.mock('@/composables/useStickers', () => ({
     setSticker: vi.fn(),
     setNote: vi.fn(),
     addBatch: vi.fn(),
+    decrementSticker: vi.fn(),
   }),
 }));
 

@@ -1,19 +1,31 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { vi } from 'vitest';
 
-// Configurable result for query builder chains
+// Configurable result for query builder chains.
+// _queryResult: default result devuelto si no hay override por tabla.
+// _queryResultByTable: mapa de table → resultado (toma precedencia sobre _queryResult).
 let _queryResult: { data: any; error: any } = { data: null, error: null };
+const _queryResultByTable = new Map<string, { data: any; error: any }>();
 
 export function setQueryResult(result: { data: any; error: any }) {
   _queryResult = result;
+}
+
+// Set per-table query result. Useful cuando una vista hace varias queries a tablas
+// distintas y necesitamos shape diferente para cada una (p.ej. profile vs stickers).
+export function setQueryResultForTable(table: string, result: { data: any; error: any }) {
+  _queryResultByTable.set(table, result);
 }
 
 // Chainable query builder that mimics Supabase's PostgREST builder.
 // ALL methods return `builder` (chainable). Resolution happens via `.then()`
 // when the builder is `await`ed — this matches Supabase's real behavior where
 // any chain like `.select().eq().single().abortSignal()` works in any order.
-function createQueryBuilder() {
-  const resolveResult = () => Promise.resolve({ ..._queryResult });
+function createQueryBuilder(table?: string) {
+  const resolveResult = () => {
+    const result = (table && _queryResultByTable.get(table)) ?? _queryResult;
+    return Promise.resolve({ ...result });
+  };
 
   const builder: Record<string, any> = {};
 
@@ -43,7 +55,7 @@ function createQueryBuilder() {
 }
 
 export const supabase = {
-  from: vi.fn(() => createQueryBuilder()),
+  from: vi.fn((table?: string) => createQueryBuilder(table)),
   auth: {
     getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
     getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
@@ -65,6 +77,13 @@ export const withAuthRetry = vi.fn().mockImplementation(async (fn: () => Promise
 // tryRescueSession: by default resolves true (rescue succeeded)
 export const tryRescueSession = vi.fn().mockResolvedValue(true);
 
+// refreshInProgress: by default returns false (no refresh in flight)
+export const refreshInProgress = vi.fn().mockReturnValue(false);
+
+// callWithTimeout: pass-through that calls fn() and returns its result
+
+export const callWithTimeout = vi.fn().mockImplementation(async (fn: () => Promise<any>) => fn());
+
 // sessionDead: reactive ref for tests
 import { ref, readonly } from 'vue';
 const _sessionDead = ref(false);
@@ -75,10 +94,11 @@ export function setSessionDead(value: boolean) {
 
 export function resetSupabaseMock() {
   _queryResult = { data: null, error: null };
+  _queryResultByTable.clear();
 
   // Reset from() to return fresh builders
   supabase.from.mockClear();
-  supabase.from.mockImplementation(() => createQueryBuilder());
+  supabase.from.mockImplementation((table?: string) => createQueryBuilder(table));
 
   // Reset auth methods and restore default return values
   supabase.auth.getSession.mockClear().mockResolvedValue({ data: { session: null }, error: null });
@@ -103,6 +123,12 @@ export function resetSupabaseMock() {
 
   tryRescueSession.mockClear();
   tryRescueSession.mockResolvedValue(true);
+
+  refreshInProgress.mockClear();
+  refreshInProgress.mockReturnValue(false);
+
+  callWithTimeout.mockClear();
+  callWithTimeout.mockImplementation(async (fn: () => Promise<any>) => fn());
 
   _sessionDead.value = false;
 }
