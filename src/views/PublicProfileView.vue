@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { supabase, withAuthRetry } from '@/lib/supabase';
+import { supabase, withAuthRetry, reestablishConnection } from '@/lib/supabase';
 import { useAuth } from '@/composables/useAuth';
-import { TOTAL_STICKERS, ALBUM_SECTIONS, codeForSticker } from '@/lib/albumData';
+import { useShare } from '@/composables/useShare';
+import { TOTAL_STICKERS, TOTAL_SECTIONS, ALBUM_SECTIONS, codeForSticker } from '@/lib/albumData';
 import { useMeta } from '@/composables/useMeta';
 
 interface PublicProfile {
@@ -22,6 +23,26 @@ const { user, profile: myProfile } = useAuth();
 const profile = ref<PublicProfile | null>(null);
 const loading = ref(true);
 const notFound = ref(false);
+const loadError = ref<string | null>(null);
+const retryAttempt = ref(0); // 0 = primer intento, >=1 = reintentando
+
+// Distingue 'no encontrado' (la query devolvio data:null sin error → el perfil
+// realmente no existe) de 'error cargando' (timeout, red, server) — un timeout
+// no debe mostrarse como "perfil no encontrado" porque confunde al usuario.
+function isTransientError(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  const msg = (err.message ?? '').toLowerCase();
+  const code = (err.code ?? '').toLowerCase();
+  return (
+    code === 'timeout' ||
+    msg.includes('tardando') ||
+    msg.includes('timeout') ||
+    msg.includes('sin conexión') ||
+    msg.includes('fetch') ||
+    msg.includes('network') ||
+    msg.includes('lenta')
+  );
+}
 const stickerMap = ref<Map<number, { owned: boolean; dupes: number }>>(new Map());
 const copied = ref('');
 
@@ -31,14 +52,41 @@ const isOwnProfile = computed(() => {
   return user.value && profile.value && user.value.id === profile.value.id;
 });
 
+// Lista de páginas completadas (la usamos tanto para el contador como para el
+// tooltip; un solo barrido sobre stickerMap).
+// Formato: equipos prefijados con su grupo "(A) México"; FWC sin prefijo.
+const completedSectionNames = computed(() => {
+  if (stickerMap.value.size === 0) return [] as string[];
+  const labels: string[] = [];
+  for (const sec of ALBUM_SECTIONS) {
+    let done = true;
+    for (let i = 0; i < sec.count; i++) {
+      if (!stickerMap.value.get(sec.startsAt + i)?.owned) {
+        done = false;
+        break;
+      }
+    }
+    if (done) labels.push(sec.group ? `(${sec.group}) ${sec.name}` : sec.name);
+  }
+  return labels;
+});
+
+const showPagesPopover = ref(false);
+function closePagesPopover() {
+  showPagesPopover.value = false;
+}
+
 const stats = computed(() => {
-  if (!profile.value) return { pct: 0, owned: 0, missing: 0, dupes: 0 };
+  if (!profile.value) {
+    return { pct: 0, owned: 0, missing: 0, dupes: 0, completedSections: 0 };
+  }
   const owned = profile.value.owned_count;
   return {
     pct: Math.round((owned / TOTAL_STICKERS) * 100 * 10) / 10,
     owned,
     missing: TOTAL_STICKERS - owned,
     dupes: profile.value.dupes_count,
+    completedSections: completedSectionNames.value.length,
   };
 });
 
@@ -95,6 +143,32 @@ const dupesBySection = computed(() => {
   return [...groups.values()];
 });
 
+const { share, isNativeShareAvailable } = useShare();
+const sharing = ref(false);
+
+async function shareProfile() {
+  if (sharing.value || !profile.value) return;
+  sharing.value = true;
+  try {
+    const name = profile.value.display_name || profile.value.username;
+    const url = `${globalThis.location.origin}/u/${profile.value.username}`;
+    const ownerLabel = isOwnProfile.value ? 'Mi álbum' : `El álbum de ${name}`;
+    const result = await share({
+      title: `${ownerLabel} del Mundial — ${stats.value.pct}% completo`,
+      text: `${ownerLabel} del Mundial: ${stats.value.owned} de ${TOTAL_STICKERS} láminas (${stats.value.pct}% completo).`,
+      url,
+    });
+    if (result === 'copied') {
+      copied.value = 'Link copiado';
+      setTimeout(() => {
+        copied.value = '';
+      }, 2000);
+    }
+  } finally {
+    sharing.value = false;
+  }
+}
+
 function copyMissing() {
   const lines = [`A ${firstName.value} le faltan ${stats.value.missing} láminas:`];
   for (const g of missingBySection.value) {
@@ -121,8 +195,17 @@ function copyDupes() {
   });
 }
 
-onMounted(async () => {
+// Backoff para auto-retry. Despues de agotarlos, mostramos error con boton manual.
+// Mas corto: cada attempt ya tiene su propio timeout interno (5s refresh + 8s
+// query), no necesitamos esperar mucho entre retries. El usuario quiere
+// feedback rapido — despues de ~15s mostramos el error con boton manual.
+const PROFILE_RETRY_DELAYS = [800, 2000];
+
+async function loadProfileData(attempt = 0): Promise<void> {
   loading.value = true;
+  notFound.value = false;
+  loadError.value = null;
+  retryAttempt.value = attempt;
 
   // Las queries van por withAuthRetry para tener timeout (8s) + retry. Las tablas
   // son publicas (public_album_stats, public_user_stickers) asi que no requieren
@@ -134,6 +217,27 @@ onMounted(async () => {
 
   if (error) {
     console.error('[PublicProfileView] profile load error:', error);
+    if (isTransientError(error)) {
+      // Error transitorio (timeout/red): rehacer conexion + auto-retry con backoff,
+      // sin recargar la página. reestablishConnection() es lo que hace efectivamente
+      // un reload: fuerza refresh de sesion, obtiene access_token nuevo, limpia
+      // cache stale del cliente. La UI muestra "Reintentando..." mientras.
+      if (attempt < PROFILE_RETRY_DELAYS.length) {
+        const delay = PROFILE_RETRY_DELAYS[attempt];
+        console.log(`[PublicProfileView] retry ${attempt + 1} in ${delay}ms`);
+        setTimeout(() => {
+          void (async () => {
+            await reestablishConnection();
+            void loadProfileData(attempt + 1);
+          })();
+        }, delay);
+        return; // dejamos loading=true para que siga el spinner
+      }
+      // Agotamos retries → mostrar error con boton manual.
+      loadError.value = 'No pudimos cargar el perfil. Conexión lenta o sin internet.';
+      loading.value = false;
+      return;
+    }
     notFound.value = true;
     loading.value = false;
     return;
@@ -171,7 +275,13 @@ onMounted(async () => {
   }
 
   loading.value = false;
-});
+}
+
+function retryLoad() {
+  void loadProfileData(0);
+}
+
+onMounted(() => loadProfileData(0));
 
 const compareInput = ref('');
 const showCompareInput = ref(false);
@@ -199,7 +309,7 @@ function compareWithOther() {
 </script>
 
 <template>
-  <div class="public-wrap">
+  <div class="public-wrap" @click="closePagesPopover">
     <!-- LOADING -->
     <div v-if="loading" class="loading-state">
       <div class="loading-mark">
@@ -209,7 +319,8 @@ function compareWithOther() {
           />
         </svg>
       </div>
-      <div>Cargando perfil...</div>
+      <div v-if="retryAttempt === 0">Cargando perfil...</div>
+      <div v-else>Conexión lenta. Reintentando...</div>
     </div>
 
     <!-- NOT FOUND -->
@@ -237,6 +348,29 @@ function compareWithOther() {
       <button class="btn-back" @click="goToMyAlbum">
         {{ user ? 'Volver a mi álbum' : 'Crear mi cuenta' }}
       </button>
+    </div>
+
+    <!-- LOAD ERROR (timeout / red) -->
+    <div v-else-if="loadError" class="not-found">
+      <div class="nf-mark">
+        <svg
+          width="64"
+          height="64"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--coral)"
+          stroke-width="1.5"
+        >
+          <path
+            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+          />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </div>
+      <h1>No se pudo cargar el perfil</h1>
+      <p>{{ loadError }}</p>
+      <button class="btn-back" @click="retryLoad">Reintentar</button>
     </div>
 
     <!-- PROFILE CARD -->
@@ -293,6 +427,59 @@ function compareWithOther() {
           <div class="stat-num stat-num-coral">{{ stats.dupes }}</div>
           <div class="stat-lbl">REP.</div>
         </div>
+        <div class="stat stat-pages">
+          <button
+            type="button"
+            class="stat-btn"
+            :aria-expanded="showPagesPopover"
+            aria-label="Ver páginas completadas"
+            @click.stop="showPagesPopover = !showPagesPopover"
+            @keydown.escape="showPagesPopover = false"
+          >
+            <div
+              class="stat-num"
+              :class="{ 'stat-num-mint': stats.completedSections === TOTAL_SECTIONS }"
+            >
+              {{ stats.completedSections }}/{{ TOTAL_SECTIONS }}
+            </div>
+            <div class="stat-lbl">PÁGINAS</div>
+          </button>
+          <div
+            v-if="showPagesPopover"
+            class="pages-popover"
+            role="dialog"
+            aria-label="Páginas completadas"
+            @click.stop
+          >
+            <div class="pages-popover-head">
+              Páginas completas
+              <span class="pages-popover-count">
+                {{ stats.completedSections }}/{{ TOTAL_SECTIONS }}
+              </span>
+            </div>
+            <p v-if="completedSectionNames.length === 0" class="pages-popover-empty">
+              Todavía no completó ninguna página.
+            </p>
+            <ul v-else class="pages-popover-list">
+              <li v-for="name in completedSectionNames" :key="name" class="pages-popover-item">
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                {{ name }}
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       <!-- MISSING / DUPES expandable lists -->
@@ -328,13 +515,36 @@ function compareWithOther() {
             </div>
           </div>
         </details>
-
-        <!-- Copy toast -->
-        <div v-if="copied" class="list-toast">{{ copied }}</div>
       </div>
 
       <!-- CTA -->
       <div class="cta">
+        <button
+          class="share-btn"
+          :disabled="sharing"
+          :aria-label="isOwnProfile ? 'Compartir mi perfil' : `Compartir el perfil de ${firstName}`"
+          @click="shareProfile"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+          {{ isNativeShareAvailable ? 'Compartir perfil' : 'Copiar link' }}
+        </button>
+
         <button v-if="isOwnProfile" class="cta-btn" @click="router.push('/album')">
           Volver a mi álbum
         </button>
@@ -390,6 +600,9 @@ function compareWithOther() {
           </div>
         </template>
       </div>
+
+      <!-- Copy / share toast — fuera de .lists para que aparezca también en perfiles sin stickers cargados -->
+      <div v-if="copied" class="list-toast">{{ copied }}</div>
 
       <div class="footer">
         <a href="/" class="brand">
@@ -598,7 +811,7 @@ function compareWithOther() {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   text-align: center;
   padding: 16px 0;
   border-top: 1px dashed var(--paper-deep);
@@ -606,12 +819,15 @@ function compareWithOther() {
 }
 .stat-num {
   font-family: var(--display);
-  font-size: 30px;
+  font-size: 26px;
   color: var(--pitch);
   line-height: 1;
 }
 .stat-num-coral {
   color: var(--coral);
+}
+.stat-num-mint {
+  color: var(--mint);
 }
 .stat-lbl {
   font-family: var(--mono);
@@ -619,6 +835,87 @@ function compareWithOther() {
   color: var(--ink-soft);
   letter-spacing: 0.15em;
   margin-top: 4px;
+}
+/* Stat clickeable de Páginas + popover con la lista. */
+.stat-pages {
+  position: relative;
+}
+.stat-btn {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.stat-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.pages-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  max-width: min(280px, 90vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid var(--paper-deep);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  z-index: 100;
+  text-align: left;
+}
+.pages-popover-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed var(--paper-deep);
+}
+.pages-popover-count {
+  font-family: var(--mono);
+  color: var(--mint);
+}
+.pages-popover-empty {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+  margin: 0;
+}
+.pages-popover-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pages-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--pitch);
+  line-height: 1.2;
+}
+.pages-popover-item svg {
+  color: var(--mint);
+  flex-shrink: 0;
 }
 
 /* Expandable lists */
@@ -720,6 +1017,32 @@ details[open] > .list-summary::before {
 }
 .cta-btn:hover {
   background: var(--pitch-deep);
+}
+.share-btn {
+  width: 100%;
+  padding: 12px 0;
+  margin-bottom: 10px;
+  background: transparent;
+  border: 1.5px solid var(--pitch);
+  color: var(--pitch);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s;
+}
+.share-btn:hover {
+  background: rgba(7, 32, 25, 0.05);
+}
+.share-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 .cta-sub {
   font-size: 11px;
