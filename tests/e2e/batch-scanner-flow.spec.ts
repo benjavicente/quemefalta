@@ -24,9 +24,9 @@ test.describe('Batch Input Flow', () => {
     await page.click('.bi-btn');
     await expect(page.locator('.bi')).not.toBeVisible();
 
-    // Verify stickers are owned in the album
-    await page.locator('.acc-team').first().click();
-    await expect(page.locator('.stk').first()).toHaveClass(/stk-owned/, { timeout: 3000 });
+    // Verify stickers are owned (FWC is zero-indexed: FWC1 = sticker #2, FWC0 = sticker #1).
+    // Use the section count badge instead of .stk first, which is FWC0 and not in the batch.
+    await expect(page.locator('.acc-team-count').first()).toContainText('3/20', { timeout: 3000 });
   });
 
   test('full team code adds all 20 stickers', async ({ page }) => {

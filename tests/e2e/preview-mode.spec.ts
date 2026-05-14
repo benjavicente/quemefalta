@@ -6,7 +6,9 @@ test.describe('Preview Mode (unauthenticated)', () => {
     await setupSupabaseRoutes(page, { authenticated: false });
   });
 
-  test('auth page shows "Explorar el album sin cuenta" button linking to /album', async ({ page }) => {
+  test('auth page shows "Explorar el album sin cuenta" button linking to /album', async ({
+    page,
+  }) => {
     await page.goto('/auth');
 
     const previewBtn = page.locator('.preview-btn');
@@ -56,7 +58,9 @@ test.describe('Preview Mode (unauthenticated)', () => {
     await expect(prompt.locator('.login-prompt-title')).toContainText('Crea tu cuenta');
   });
 
-  test('login prompt has "Crear cuenta con Google" and "Seguir mirando" buttons', async ({ page }) => {
+  test('login prompt has "Crear cuenta con Google" and "Seguir mirando" buttons', async ({
+    page,
+  }) => {
     await page.goto('/album');
 
     await page.locator('.acc-group-head').first().click();

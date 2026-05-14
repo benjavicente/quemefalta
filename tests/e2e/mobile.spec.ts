@@ -23,12 +23,11 @@ test.describe('Mobile (375px)', () => {
     await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
-    // Tap 3 stickers via touchscreen
+    // Tap 3 stickers — locator.tap() dispatches a real touch event AND auto-scrolls
+    // the target into view, which page.touchscreen.tap() does not.
     for (let i = 0; i < 3; i++) {
       const sticker = page.locator('.stk').nth(i);
-      const box = await sticker.boundingBox();
-      if (!box) throw new Error(`Sticker ${i} not visible`);
-      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await sticker.tap();
       await expect(sticker).toHaveClass(/stk-owned/, { timeout: 3000 });
     }
 

@@ -49,12 +49,7 @@ export function totalPacksFromZero(N: number, k = 7): number {
 }
 
 /** Generate projection table for common pack milestones */
-export function projectionTable(
-  K: number,
-  N: number,
-  packPrice: number,
-  k = 7,
-): ProjectionRow[] {
+export function projectionTable(K: number, N: number, packPrice: number, k = 7): ProjectionRow[] {
   const milestones = [10, 25, 50, 100, 150, 200, 300];
   return milestones.map((packs) => {
     const newStickers = expectedNew(K, N, packs, k);

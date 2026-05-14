@@ -57,10 +57,22 @@ describe('preprocessImage', () => {
   it('converts pixels to grayscale and binarizes', () => {
     // 2x2 image: white, black, gray, gray
     const pixels = [
-      255, 255, 255, 255, // white
-      0, 0, 0, 255, // black
-      128, 128, 128, 255, // mid gray
-      200, 200, 200, 255, // light gray
+      255,
+      255,
+      255,
+      255, // white
+      0,
+      0,
+      0,
+      255, // black
+      128,
+      128,
+      128,
+      255, // mid gray
+      200,
+      200,
+      200,
+      255, // light gray
     ];
     const { canvas } = createMockCanvas(2, 2, pixels);
 
@@ -73,16 +85,26 @@ describe('preprocessImage', () => {
     const { canvas } = createMockCanvas(10, 8);
 
     // Mock createElement to track created canvases
-    const createdCanvases: any[] = [];
+    const createdCanvases: { width: number; height: number }[] = [];
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       if (tag === 'canvas') {
-        const c = { width: 0, height: 0, getContext: vi.fn().mockReturnValue({
-          getImageData: vi.fn().mockReturnValue({ data: new Uint8ClampedArray(0), width: 0, height: 0 }),
-          putImageData: vi.fn(),
-          createImageData: vi.fn((w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h })),
-          drawImage: vi.fn(),
-          imageSmoothingEnabled: true,
-        }) };
+        const c = {
+          width: 0,
+          height: 0,
+          getContext: vi.fn().mockReturnValue({
+            getImageData: vi
+              .fn()
+              .mockReturnValue({ data: new Uint8ClampedArray(0), width: 0, height: 0 }),
+            putImageData: vi.fn(),
+            createImageData: vi.fn((w: number, h: number) => ({
+              data: new Uint8ClampedArray(w * h * 4),
+              width: w,
+              height: h,
+            })),
+            drawImage: vi.fn(),
+            imageSmoothingEnabled: true,
+          }),
+        };
         createdCanvases.push(c);
         return c as unknown as HTMLElement;
       }

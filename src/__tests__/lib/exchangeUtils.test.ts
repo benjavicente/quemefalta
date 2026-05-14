@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  computeExchange,
-  formatExchangeList,
-  type StickerMap,
-} from '@/lib/exchangeUtils';
+import { computeExchange, formatExchangeList, type StickerMap } from '@/lib/exchangeUtils';
 
 function makeMap(entries: Record<number, { owned: boolean; dupes: number }>): StickerMap {
   return new Map(Object.entries(entries).map(([k, v]) => [Number(k), v]));
@@ -84,7 +80,7 @@ describe('computeExchange', () => {
 
   it('groups items by section', () => {
     const mapA = makeMap({
-      1: { owned: true, dupes: 1 },  // FWC0 — intro section
+      1: { owned: true, dupes: 1 }, // FWC0 — intro section
       21: { owned: true, dupes: 1 }, // MEX1 — México section
     });
     const mapB = makeMap({});
@@ -119,7 +115,14 @@ describe('formatExchangeList', () => {
   it('formats a single-group list', () => {
     const groups = [
       {
-        section: { id: 'intro', name: 'Introducción & FIFA Museum', code: 'FWC', count: 20, startsAt: 1, zeroIndexed: true },
+        section: {
+          id: 'intro',
+          name: 'Introducción & FIFA Museum',
+          code: 'FWC',
+          count: 20,
+          startsAt: 1,
+          zeroIndexed: true,
+        },
         items: [
           { stickerNumber: 1, code: 'FWC0', dupeCount: 1 },
           { stickerNumber: 3, code: 'FWC2', dupeCount: 3 },
@@ -134,7 +137,14 @@ describe('formatExchangeList', () => {
   it('only shows ×N when dupeCount > 1', () => {
     const groups = [
       {
-        section: { id: 'intro', name: 'Intro', code: 'FWC', count: 20, startsAt: 1, zeroIndexed: true },
+        section: {
+          id: 'intro',
+          name: 'Intro',
+          code: 'FWC',
+          count: 20,
+          startsAt: 1,
+          zeroIndexed: true,
+        },
         items: [{ stickerNumber: 1, code: 'FWC0', dupeCount: 1 }],
       },
     ];

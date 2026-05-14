@@ -11,21 +11,25 @@ const route = useRoute();
 const userA = computed(() => route.params.userA as string);
 const userB = computed(() => route.params.userB as string);
 
-const { loading, error, profileA, profileB, statsA, statsB, exchange, load } =
-  useExchange(userA, userB);
+const { loading, error, profileA, profileB, statsA, statsB, exchange, load } = useExchange(
+  userA,
+  userB,
+);
 
 const copied = ref('');
 
 function showCopied(msg: string) {
   copied.value = msg;
-  setTimeout(() => { copied.value = ''; }, 2000);
+  setTimeout(() => {
+    copied.value = '';
+  }, 2000);
 }
 
-const nameA = computed(() =>
-  profileA.value?.display_name?.split(' ')[0] ?? profileA.value?.username ?? userA.value,
+const nameA = computed(
+  () => profileA.value?.display_name?.split(' ')[0] ?? profileA.value?.username ?? userA.value,
 );
-const nameB = computed(() =>
-  profileB.value?.display_name?.split(' ')[0] ?? profileB.value?.username ?? userB.value,
+const nameB = computed(
+  () => profileB.value?.display_name?.split(' ')[0] ?? profileB.value?.username ?? userB.value,
 );
 
 const metaInfo = computed(() => {
@@ -47,13 +51,23 @@ function initialOf(profile: { display_name: string | null; username: string }) {
 
 function copyAGivesB() {
   if (!exchange.value) return;
-  const text = formatExchangeList(nameA.value, nameB.value, exchange.value.aGivesB, exchange.value.aGivesBCount);
+  const text = formatExchangeList(
+    nameA.value,
+    nameB.value,
+    exchange.value.aGivesB,
+    exchange.value.aGivesBCount,
+  );
   navigator.clipboard?.writeText(text).then(() => showCopied('Lista copiada'));
 }
 
 function copyBGivesA() {
   if (!exchange.value) return;
-  const text = formatExchangeList(nameB.value, nameA.value, exchange.value.bGivesA, exchange.value.bGivesACount);
+  const text = formatExchangeList(
+    nameB.value,
+    nameA.value,
+    exchange.value.bGivesA,
+    exchange.value.bGivesACount,
+  );
   navigator.clipboard?.writeText(text).then(() => showCopied('Lista copiada'));
 }
 
@@ -61,10 +75,24 @@ function copyAll() {
   if (!exchange.value) return;
   const parts: string[] = [];
   if (exchange.value.aGivesBCount > 0) {
-    parts.push(formatExchangeList(nameA.value, nameB.value, exchange.value.aGivesB, exchange.value.aGivesBCount));
+    parts.push(
+      formatExchangeList(
+        nameA.value,
+        nameB.value,
+        exchange.value.aGivesB,
+        exchange.value.aGivesBCount,
+      ),
+    );
   }
   if (exchange.value.bGivesACount > 0) {
-    parts.push(formatExchangeList(nameB.value, nameA.value, exchange.value.bGivesA, exchange.value.bGivesACount));
+    parts.push(
+      formatExchangeList(
+        nameB.value,
+        nameA.value,
+        exchange.value.bGivesA,
+        exchange.value.bGivesACount,
+      ),
+    );
   }
   const text = parts.join('\n\n');
   navigator.clipboard?.writeText(text).then(() => showCopied('Intercambio completo copiado'));
@@ -88,7 +116,9 @@ onMounted(load);
     <div v-if="loading" class="loading-state">
       <div class="loading-mark">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="var(--gold)" stroke="none">
-          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+          <polygon
+            points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+          />
         </svg>
       </div>
       <div>Calculando intercambio...</div>
@@ -97,7 +127,14 @@ onMounted(load);
     <!-- ERROR -->
     <div v-else-if="error" class="not-found">
       <div class="nf-mark">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--chalk-dim)" stroke-width="1.5">
+        <svg
+          width="64"
+          height="64"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--chalk-dim)"
+          stroke-width="1.5"
+        >
           <circle cx="12" cy="12" r="10" />
           <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
           <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -112,8 +149,17 @@ onMounted(load);
     <div v-else-if="profileA && profileB && exchange" class="card">
       <!-- Decorative star -->
       <div class="card-star">
-        <svg width="180" height="180" viewBox="0 0 24 24" fill="var(--gold)" stroke="none" opacity="0.15">
-          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+        <svg
+          width="180"
+          height="180"
+          viewBox="0 0 24 24"
+          fill="var(--gold)"
+          stroke="none"
+          opacity="0.15"
+        >
+          <polygon
+            points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+          />
         </svg>
       </div>
 
@@ -135,7 +181,16 @@ onMounted(load);
         </a>
 
         <div class="swap-icon" aria-hidden="true">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--gold)"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <polyline points="17 1 21 5 17 9" />
             <path d="M3 11V9a4 4 0 0 1 4-4h14" />
             <polyline points="7 23 3 19 7 15" />
@@ -167,9 +222,15 @@ onMounted(load);
           </summary>
           <div class="list-body">
             <div v-for="g in exchange.aGivesB" :key="g.section.id" class="list-group">
-              <div class="list-group-name">{{ teamFlagEmoji(g.section.code) }} {{ g.section.name }}</div>
+              <div class="list-group-name">
+                {{ teamFlagEmoji(g.section.code) }} {{ g.section.name }}
+              </div>
               <div class="list-group-codes">
-                {{ g.items.map(i => i.dupeCount > 1 ? `${i.code} (×${i.dupeCount})` : i.code).join(', ') }}
+                {{
+                  g.items
+                    .map((i) => (i.dupeCount > 1 ? `${i.code} (×${i.dupeCount})` : i.code))
+                    .join(', ')
+                }}
               </div>
             </div>
           </div>
@@ -183,9 +244,15 @@ onMounted(load);
           </summary>
           <div class="list-body">
             <div v-for="g in exchange.bGivesA" :key="g.section.id" class="list-group">
-              <div class="list-group-name">{{ teamFlagEmoji(g.section.code) }} {{ g.section.name }}</div>
+              <div class="list-group-name">
+                {{ teamFlagEmoji(g.section.code) }} {{ g.section.name }}
+              </div>
               <div class="list-group-codes">
-                {{ g.items.map(i => i.dupeCount > 1 ? `${i.code} (×${i.dupeCount})` : i.code).join(', ') }}
+                {{
+                  g.items
+                    .map((i) => (i.dupeCount > 1 ? `${i.code} (×${i.dupeCount})` : i.code))
+                    .join(', ')
+                }}
               </div>
             </div>
           </div>
@@ -197,14 +264,28 @@ onMounted(load);
         <!-- Action buttons -->
         <div class="actions">
           <button class="action-btn" @click="copyAll">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
             </svg>
             Copiar todo
           </button>
           <button class="action-btn" @click="shareComparison">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <circle cx="18" cy="5" r="3" />
               <circle cx="6" cy="12" r="3" />
               <circle cx="18" cy="19" r="3" />
@@ -219,7 +300,14 @@ onMounted(load);
       <!-- Empty exchange -->
       <div v-else class="empty">
         <div class="empty-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--chalk-dim)" stroke-width="1.5">
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--chalk-dim)"
+            stroke-width="1.5"
+          >
             <circle cx="12" cy="12" r="10" />
             <line x1="8" y1="15" x2="16" y2="15" />
             <line x1="9" y1="9" x2="9.01" y2="9" />
@@ -233,8 +321,17 @@ onMounted(load);
       <!-- Footer -->
       <div class="footer">
         <a href="/" class="brand">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--gold)" stroke="none" style="vertical-align: middle; margin-right: 4px">
-            <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="var(--gold)"
+            stroke="none"
+            style="vertical-align: middle; margin-right: 4px"
+          >
+            <polygon
+              points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+            />
           </svg>
           QueMeFalta
         </a>
@@ -250,14 +347,19 @@ onMounted(load);
   display: flex;
   align-items: center;
   justify-content: center;
-  background-image: radial-gradient(ellipse at 50% 0%, rgba(232,179,65,0.08) 0%, transparent 60%);
+  background-image: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(232, 179, 65, 0.08) 0%,
+    transparent 60%
+  );
 }
 
 /* Loading & error — same as PublicProfileView */
-.loading-state, .not-found {
+.loading-state,
+.not-found {
   text-align: center;
   padding: 80px 20px;
-  color: rgba(246,241,225,0.55);
+  color: rgba(246, 241, 225, 0.55);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -267,8 +369,17 @@ onMounted(load);
   color: var(--gold);
   animation: spin 2s linear infinite;
 }
-@keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
-.nf-mark { margin-bottom: 8px; }
+@keyframes spin {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.nf-mark {
+  margin-bottom: 8px;
+}
 .not-found h1 {
   font-family: var(--display);
   font-size: 36px;
@@ -306,7 +417,7 @@ onMounted(load);
   padding: 28px 22px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
 }
 .card-star {
   position: absolute;
@@ -343,7 +454,7 @@ onMounted(load);
   transition: box-shadow 0.15s;
 }
 .profile-mini:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 .mini-avatar {
   width: 48px;
@@ -428,14 +539,18 @@ onMounted(load);
   cursor: pointer;
   list-style: none;
 }
-.list-summary::-webkit-details-marker { display: none; }
+.list-summary::-webkit-details-marker {
+  display: none;
+}
 .list-summary::before {
   content: '\25B6';
   font-size: 8px;
   margin-right: 8px;
   transition: transform 0.15s;
 }
-details[open] > .list-summary::before { transform: rotate(90deg); }
+details[open] > .list-summary::before {
+  transform: rotate(90deg);
+}
 .list-copy {
   padding: 4px 10px;
   font-family: var(--mono);
@@ -443,12 +558,14 @@ details[open] > .list-summary::before { transform: rotate(90deg); }
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--gold-deep);
-  background: rgba(232,179,65,0.12);
-  border: 1px solid rgba(232,179,65,0.25);
+  background: rgba(232, 179, 65, 0.12);
+  border: 1px solid rgba(232, 179, 65, 0.25);
   border-radius: 4px;
   cursor: pointer;
 }
-.list-copy:hover { background: rgba(232,179,65,0.2); }
+.list-copy:hover {
+  background: rgba(232, 179, 65, 0.2);
+}
 .list-body {
   padding: 0 14px 12px;
   display: flex;
@@ -500,14 +617,18 @@ details[open] > .list-summary::before { transform: rotate(90deg); }
   cursor: pointer;
   font-family: inherit;
 }
-.action-btn:hover { background: var(--pitch-deep); }
+.action-btn:hover {
+  background: var(--pitch-deep);
+}
 
 /* Empty state */
 .empty {
   text-align: center;
   padding: 30px 0 10px;
 }
-.empty-icon { margin-bottom: 12px; }
+.empty-icon {
+  margin-bottom: 12px;
+}
 .empty-text {
   font-family: var(--display);
   font-size: 18px;

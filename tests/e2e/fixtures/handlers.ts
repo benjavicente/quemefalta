@@ -82,7 +82,12 @@ export async function setupSupabaseRoutes(page: Page, options: HandlerOptions = 
       // --- Auth ---
       if (path.includes('/auth/v1/token')) {
         if (authRefreshError && shouldFail(authRefreshError, 'auth-refresh')) {
-          return json(route, authRefreshError.body ?? { error: 'Refresh failed' }, authRefreshError.status, delay);
+          return json(
+            route,
+            authRefreshError.body ?? { error: 'Refresh failed' },
+            authRefreshError.status,
+            delay,
+          );
         }
         return json(route, session ?? { error: 'No session' }, session ? 200 : 401, delay);
       }

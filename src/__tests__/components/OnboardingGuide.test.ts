@@ -89,7 +89,6 @@ function mountGuide() {
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function waitForVisible(_w: ReturnType<typeof mount>) {
   // Initial 500ms delay + 300ms scroll settle
   vi.advanceTimersByTime(500);

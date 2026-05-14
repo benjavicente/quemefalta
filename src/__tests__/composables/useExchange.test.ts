@@ -48,7 +48,14 @@ describe('useExchange', () => {
   it('loads exchange data for two users', async () => {
     mockFromTable({
       public_album_stats: {
-        data: { id: 'u1', username: 'alice', display_name: 'Alice', avatar_url: null, owned_count: 100, dupes_count: 10 },
+        data: {
+          id: 'u1',
+          username: 'alice',
+          display_name: 'Alice',
+          avatar_url: null,
+          owned_count: 100,
+          dupes_count: 10,
+        },
         error: null,
       },
       public_user_stickers: {
@@ -116,7 +123,14 @@ describe('useExchange', () => {
   it('computes stats for both users', async () => {
     mockFromTable({
       public_album_stats: {
-        data: { id: 'u1', username: 'alice', display_name: 'Alice', avatar_url: null, owned_count: 490, dupes_count: 25 },
+        data: {
+          id: 'u1',
+          username: 'alice',
+          display_name: 'Alice',
+          avatar_url: null,
+          owned_count: 490,
+          dupes_count: 25,
+        },
         error: null,
       },
       public_user_stickers: { data: [], error: null },

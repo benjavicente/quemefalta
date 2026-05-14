@@ -19,12 +19,16 @@ const dupesInput = ref(0);
 // Auto-fill from user data when logged in
 watch(
   () => stats.value.owned,
-  (val) => { if (!isPreview.value) ownedInput.value = val; },
+  (val) => {
+    if (!isPreview.value) ownedInput.value = val;
+  },
   { immediate: true },
 );
 watch(
   () => stats.value.dupes,
-  (val) => { if (!isPreview.value) dupesInput.value = val; },
+  (val) => {
+    if (!isPreview.value) dupesInput.value = val;
+  },
   { immediate: true },
 );
 
@@ -38,7 +42,9 @@ const K = computed(() => Math.max(0, Math.min(N, ownedInput.value || 0)));
 const currentDupes = computed(() => Math.max(0, dupesInput.value || 0));
 const missing = computed(() => N - K.value);
 // Map people count → tau with diminishing returns: tau = 1 - 0.88^n
-const tauDecimal = computed(() => tradePeople.value <= 0 ? 0 : Math.min(0.92, 1 - Math.pow(0.88, tradePeople.value)));
+const tauDecimal = computed(() =>
+  tradePeople.value <= 0 ? 0 : Math.min(0.92, 1 - Math.pow(0.88, tradePeople.value)),
+);
 
 const totalFromZero = computed(() => totalPacksFromZero(N));
 
@@ -55,7 +61,14 @@ const tradeProfile = computed(() => {
 
 // Main simulation
 const sim = computed(() =>
-  simulateWithTrade(K.value, currentDupes.value, N, extraPacks.value, packPrice.value, tauDecimal.value),
+  simulateWithTrade(
+    K.value,
+    currentDupes.value,
+    N,
+    extraPacks.value,
+    packPrice.value,
+    tauDecimal.value,
+  ),
 );
 
 // Recommendation based on real cost
@@ -63,9 +76,20 @@ const recommendation = computed(() => {
   const cpn = sim.value.costPerNewReal;
   if (cpn === Infinity) return { level: 'neutral', text: 'Album completo' };
   const ratio = cpn / mlPrice.value;
-  if (ratio < 0.5) return { level: 'green', text: `Sobres + cambio sale ${formatCLP(cpn)}/nueva — mas barato que ML (${formatCLP(mlPrice.value)})` };
-  if (ratio < 1.0) return { level: 'yellow', text: `Casi igual: ${formatCLP(cpn)}/nueva vs ${formatCLP(mlPrice.value)} en ML` };
-  return { level: 'red', text: `Mejor comprar en ML: sobre sale ${formatCLP(cpn)}/nueva vs ${formatCLP(mlPrice.value)} individual` };
+  if (ratio < 0.5)
+    return {
+      level: 'green',
+      text: `Sobres + cambio sale ${formatCLP(cpn)}/nueva — mas barato que ML (${formatCLP(mlPrice.value)})`,
+    };
+  if (ratio < 1.0)
+    return {
+      level: 'yellow',
+      text: `Casi igual: ${formatCLP(cpn)}/nueva vs ${formatCLP(mlPrice.value)} en ML`,
+    };
+  return {
+    level: 'red',
+    text: `Mejor comprar en ML: sobre sale ${formatCLP(cpn)}/nueva vs ${formatCLP(mlPrice.value)} individual`,
+  };
 });
 
 // Table (without trade, raw projection)
@@ -146,7 +170,8 @@ function formatCLP(n: number): string {
         Faltan <strong>{{ missing }}</strong>
       </div>
       <div class="calc-funfact">
-        Completar el album sin cambiar necesita ~{{ totalFromZero.toLocaleString('es-CL') }} sobres en promedio
+        Completar el album sin cambiar necesita ~{{ totalFromZero.toLocaleString('es-CL') }} sobres
+        en promedio
       </div>
     </div>
 
@@ -157,7 +182,14 @@ function formatCLP(n: number): string {
       <div class="calc-input-row">
         <label class="calc-input-label">Sobres extra</label>
         <div class="calc-slider-row">
-          <input v-model.number="extraPacks" type="range" min="0" max="500" step="5" class="calc-range" />
+          <input
+            v-model.number="extraPacks"
+            type="range"
+            min="0"
+            max="500"
+            step="5"
+            class="calc-range"
+          />
           <input v-model.number="extraPacks" type="number" min="0" max="999" class="calc-num" />
         </div>
       </div>
@@ -165,7 +197,14 @@ function formatCLP(n: number): string {
       <div class="calc-input-row">
         <label class="calc-input-label">Personas con las que cambio: {{ tradePeople }}</label>
         <div class="calc-slider-row">
-          <input v-model.number="tradePeople" type="range" min="0" max="20" step="1" class="calc-range" />
+          <input
+            v-model.number="tradePeople"
+            type="range"
+            min="0"
+            max="20"
+            step="1"
+            class="calc-range"
+          />
           <span class="calc-tau-label">{{ tradeProfile }}</span>
         </div>
       </div>
@@ -201,9 +240,13 @@ function formatCLP(n: number): string {
         </div>
         <div class="calc-result">
           Cada lamina nueva te sale
-          <span class="calc-result-val">{{ formatCLP(tradePeople > 0 ? sim.costPerNewReal : sim.costPerNewNaive) }}</span>
+          <span class="calc-result-val">{{
+            formatCLP(tradePeople > 0 ? sim.costPerNewReal : sim.costPerNewNaive)
+          }}</span>
           <template v-if="tradePeople > 0">
-            <span class="calc-result-hint">(seria {{ formatCLP(sim.costPerNewNaive) }} sin cambiar repes)</span>
+            <span class="calc-result-hint"
+              >(seria {{ formatCLP(sim.costPerNewNaive) }} sin cambiar repes)</span
+            >
           </template>
         </div>
         <div v-if="sim.dupesDead > 0" class="calc-result calc-result-dead">
@@ -251,36 +294,56 @@ function formatCLP(n: number): string {
       <svg class="calc-svg" :viewBox="`0 0 ${svgW} ${svgH}`" preserveAspectRatio="xMidYMid meet">
         <!-- Grid -->
         <line
-          v-for="t in yTicks" :key="'yg' + t"
-          :x1="pad.left" :x2="svgW - pad.right" :y1="sy(t)" :y2="sy(t)"
+          v-for="t in yTicks"
+          :key="'yg' + t"
+          :x1="pad.left"
+          :x2="svgW - pad.right"
+          :y1="sy(t)"
+          :y2="sy(t)"
           class="calc-grid"
         />
         <!-- Current % baseline -->
         <line
-          :x1="pad.left" :x2="svgW - pad.right"
-          :y1="sy(currentPct)" :y2="sy(currentPct)"
+          :x1="pad.left"
+          :x2="svgW - pad.right"
+          :y1="sy(currentPct)"
+          :y2="sy(currentPct)"
           class="calc-baseline"
         />
         <!-- 3 curves -->
         <polyline
-          v-for="c in curves" :key="c.tau"
+          v-for="c in curves"
+          :key="c.tau"
           :points="curvePoints(c.points)"
-          fill="none" :stroke="c.color" stroke-width="1.8"
-          stroke-linecap="round" stroke-linejoin="round"
+          fill="none"
+          :stroke="c.color"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
           :opacity="c.tau === 0 ? 0.5 : 1"
         />
         <!-- Y labels -->
         <text
-          v-for="t in yTicks" :key="'yl' + t"
-          :x="pad.left - 4" :y="sy(t) + 3"
-          class="calc-axis-label" text-anchor="end"
-        >{{ t }}%</text>
+          v-for="t in yTicks"
+          :key="'yl' + t"
+          :x="pad.left - 4"
+          :y="sy(t) + 3"
+          class="calc-axis-label"
+          text-anchor="end"
+        >
+          {{ t }}%
+        </text>
         <!-- X labels -->
         <text
-          v-for="t in xTicks" :key="'xl' + t"
-          :x="sx(t)" :y="svgH - 6"
-          class="calc-axis-label" text-anchor="middle"
-        >{{ t }}</text>
+          v-for="t in xTicks"
+          :key="'xl' + t"
+          :x="sx(t)"
+          :y="svgH - 6"
+          class="calc-axis-label"
+          text-anchor="middle"
+        >
+          {{ t }}
+        </text>
         <text :x="svgW / 2" :y="svgH" class="calc-axis-label" text-anchor="middle">sobres</text>
       </svg>
       <!-- Legend -->

@@ -356,7 +356,9 @@ function goCompare() {
   border-radius: 6px;
   color: var(--pitch);
 }
-.compare-input::placeholder { color: var(--ink-soft); }
+.compare-input::placeholder {
+  color: var(--ink-soft);
+}
 .compare-go {
   padding: 10px 16px;
   font-family: var(--mono);
@@ -368,7 +370,10 @@ function goCompare() {
   border-radius: 6px;
   cursor: pointer;
 }
-.compare-go:disabled { opacity: 0.4; cursor: default; }
+.compare-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 .close-btn {
   width: 100%;
