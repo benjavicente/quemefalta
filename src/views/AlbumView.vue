@@ -29,6 +29,10 @@ const {
   loaded,
   syncError,
   sessionDead,
+  pendingCount,
+  failedCount,
+  retryAllPending,
+  discardAllPending,
   getSticker,
   setNote,
   adjustDupes,
@@ -453,6 +457,27 @@ const userInitial = computed(() => {
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
       Error guardando: {{ syncError }}
+    </div>
+
+    <!-- SYNC QUEUE STATUS -->
+    <div
+      v-if="(pendingCount > 0 || failedCount > 0) && !sessionDead && !isPreview"
+      class="sync-status"
+      :class="failedCount > 0 ? 'sync-status-failed' : 'sync-status-pending'"
+      role="status"
+    >
+      <span class="sync-status-text">
+        <span v-if="failedCount > 0">
+          {{ failedCount }} cambio{{ failedCount === 1 ? '' : 's' }} sin guardar
+        </span>
+        <span v-else-if="pendingCount > 0">
+          Guardando {{ pendingCount }} cambio{{ pendingCount === 1 ? '' : 's' }}...
+        </span>
+      </span>
+      <div v-if="failedCount > 0" class="sync-status-actions">
+        <button class="sync-btn sync-btn-retry" @click="retryAllPending">Reintentar</button>
+        <button class="sync-btn sync-btn-discard" @click="discardAllPending">Descartar</button>
+      </div>
     </div>
 
     <!-- PREVIEW BANNER -->
@@ -943,6 +968,59 @@ const userInitial = computed(() => {
   align-items: center;
   gap: 8px;
   text-align: center;
+}
+
+/* SYNC STATUS (pending/failed queue) */
+.sync-status {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.sync-status-pending {
+  background: rgba(245, 165, 36, 0.12);
+  border-bottom: 1px solid rgba(245, 165, 36, 0.3);
+  color: #f5a524;
+}
+.sync-status-failed {
+  background: rgba(226, 90, 58, 0.15);
+  border-bottom: 1px solid rgba(226, 90, 58, 0.3);
+  color: #ff8a80;
+}
+.sync-status-text {
+  flex: 1;
+  text-align: left;
+}
+.sync-status-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.sync-btn {
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sync-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.sync-btn-retry {
+  background: rgba(226, 90, 58, 0.25);
+}
+.sync-btn-discard {
+  opacity: 0.75;
 }
 
 /* LOADING */

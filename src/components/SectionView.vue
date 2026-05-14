@@ -23,6 +23,7 @@ const emit = defineEmits<{
 const {
   stickers,
   getSticker,
+  getStickerSyncStatus,
   cycleSticker,
   decrementSticker,
   markSectionComplete,
@@ -190,7 +191,10 @@ onUnmounted(() => cleanupPaint());
           }}</span>
           {{ section.name }}
         </div>
-        <div class="sect-meta">{{ section.code }}{{ section.zeroIndexed ? 0 : 1 }}—{{ section.code }}{{ section.zeroIndexed ? section.count - 1 : section.count }}</div>
+        <div class="sect-meta">
+          {{ section.code }}{{ section.zeroIndexed ? 0 : 1 }}—{{ section.code
+          }}{{ section.zeroIndexed ? section.count - 1 : section.count }}
+        </div>
       </div>
       <div class="sect-badge">{{ ownedCount }}/{{ section.count }}</div>
     </header>
@@ -202,7 +206,10 @@ onUnmounted(() => cleanupPaint());
         :class="{
           'sect-grid-squad': item.variant === 'squad',
           'sect-grid-wide': item.variant === 'fwc-h',
-          'sect-grid-new-row': isFwcSection && item.variant === 'fwc-v' && items[items.indexOf(item) - 1]?.variant === 'fwc-h',
+          'sect-grid-new-row':
+            isFwcSection &&
+            item.variant === 'fwc-v' &&
+            items[items.indexOf(item) - 1]?.variant === 'fwc-h',
         }"
         @pointerdown="onPaintStart(item.number, $event)"
       >
@@ -212,6 +219,7 @@ onUnmounted(() => cleanupPaint());
           :state="item.state"
           :variant="item.variant"
           :anim-delay="(paintOrder.get(item.number) ?? 0) * 40"
+          :sync-status="getStickerSyncStatus(item.number)"
           @cycle="isPreview ? emit('openDetail', item.number) : cycleSticker(item.number)"
           @decrement="isPreview ? emit('openDetail', item.number) : decrementSticker(item.number)"
           @open-detail="emit('openDetail', item.number)"

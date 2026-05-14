@@ -12,6 +12,8 @@ const props = defineProps<{
   state: StickerState;
   variant?: 'normal' | 'crest' | 'squad' | 'fwc-h' | 'fwc-v';
   animDelay?: number;
+  /** Estado de sync: 'pending' (reintentando), 'failed' (no se guardo), o null si OK. */
+  syncStatus?: 'pending' | 'failed' | null;
 }>();
 
 const emit = defineEmits<{
@@ -173,6 +175,14 @@ function onPointerCancel() {
         ×{{ dupes + 1 }}
       </div>
       <div v-if="hasNote" class="stk-note-dot" />
+      <!-- Sync status: orange dot = pendiente de guardar, red = fallo definitivo -->
+      <div
+        v-if="syncStatus"
+        class="stk-sync-dot"
+        :class="syncStatus === 'failed' ? 'stk-sync-failed' : 'stk-sync-pending'"
+        :title="syncStatus === 'failed' ? 'No se pudo guardar' : 'Guardando...'"
+        :aria-label="syncStatus === 'failed' ? 'No se pudo guardar' : 'Guardando'"
+      />
     </div>
     <button
       v-if="owned"
@@ -372,6 +382,32 @@ function onPointerCancel() {
   background: var(--pitch-deep);
   border-radius: 50%;
   z-index: 2;
+}
+.stk-sync-dot {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  z-index: 3;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4);
+}
+.stk-sync-pending {
+  background: #f5a524;
+  animation: stk-sync-pulse 1.4s ease-in-out infinite;
+}
+.stk-sync-failed {
+  background: #e25a3a;
+}
+@keyframes stk-sync-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* Variant: Crest (sticker 1) */
