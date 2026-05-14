@@ -8,7 +8,10 @@ import {
   projectionTable,
   simulateWithTrade,
   projectionCurvesWithTrade,
+  expectedNew,
 } from '@/lib/calcUtils';
+
+const STICKERS_PER_PACK = 7;
 
 const isPreview = inject<Ref<boolean>>('isPreview', ref(false));
 const { stats } = useStickers();
@@ -48,15 +51,26 @@ const tauDecimal = computed(() =>
 
 const totalFromZero = computed(() => totalPacksFromZero(N));
 
-// Profile label for trade people slider
+// Profile label for trade people slider.
+// WhatsApp y Facebook son los canales mas comunes en LATAM para coleccionistas;
+// dejamos Telegram fuera para no sesgar la sugerencia a una sola app.
 const tradeProfile = computed(() => {
   const n = tradePeople.value;
-  if (n === 0) return 'No cambio';
-  if (n <= 2) return 'Familia / pega';
-  if (n <= 5) return 'Amigos + conocidos';
-  if (n <= 10) return 'Grupo Telegram';
-  if (n <= 15) return 'Telegram + plaza';
-  return 'Varios grupos / ferias';
+  if (n === 0) return 'No cambio con nadie';
+  if (n <= 2) return 'Familia o compañeros de trabajo';
+  if (n <= 5) return 'Amigos y conocidos';
+  if (n <= 10) return 'Grupo de WhatsApp o Facebook';
+  if (n <= 15) return 'Varios grupos de WhatsApp/Facebook';
+  return 'Comunidad activa (varios canales)';
+});
+
+// Esperanza por sobre = láminas nuevas promedio que esperás de UN sobre,
+// dado cuántas tenés ya. Cuanto más completo está tu álbum, más bajo este número
+// (es más probable que cada lámina sea repetida).
+const expectedNewPerPack = computed(() => expectedNew(K.value, N, 1));
+const newPercentagePerPack = computed(() => {
+  if (K.value >= N) return 0;
+  return Math.round((expectedNewPerPack.value / STICKERS_PER_PACK) * 100);
 });
 
 // Main simulation
@@ -71,24 +85,57 @@ const sim = computed(() =>
   ),
 );
 
-// Recommendation based on real cost
+// Cuántos intercambios EXITOSOS necesitarías por persona en promedio para
+// alcanzar las "nuevas por cambio" que predice la simulación.
+const tradesPerPerson = computed(() => {
+  if (tradePeople.value === 0 || sim.value.newFromTrade === 0) return 0;
+  return Math.max(1, Math.round(sim.value.newFromTrade / tradePeople.value));
+});
+
+// Porcentaje de nuevas dentro del total de láminas que sacarías de los sobres
+// (newDirect / (newDirect + dupesGenerated)). Sirve para mostrar al lado del
+// número en el simulador, igual que el "% del sobre" de la card de estado.
+const newPctFromPacks = computed(() => {
+  const total = sim.value.newDirect + sim.value.dupesGenerated;
+  if (total === 0) return 0;
+  return Math.round((sim.value.newDirect / total) * 100);
+});
+
+// Recommendation based on real cost.
+// Solo aplica cuando estás comprando sobres — si no, comparar contra "lámina suelta" no tiene sentido.
 const recommendation = computed(() => {
+  if (extraPacks.value === 0) {
+    if (sim.value.newFromTrade > 0) {
+      return {
+        level: 'green',
+        text: `Esas ${sim.value.newFromTrade} nuevas te salen gratis: solo estás cambiando repetidas.`,
+      };
+    }
+    return {
+      level: 'neutral',
+      text: 'Sin sobres y sin cambios no hay nuevas. Mueve los controles para simular.',
+    };
+  }
   const cpn = sim.value.costPerNewReal;
-  if (cpn === Infinity) return { level: 'neutral', text: 'Album completo' };
+  if (cpn === Infinity || cpn === 0) {
+    return { level: 'neutral', text: 'Ajusta los valores arriba para ver la comparación.' };
+  }
   const ratio = cpn / mlPrice.value;
-  if (ratio < 0.5)
+  if (ratio < 0.5) {
     return {
       level: 'green',
-      text: `Sobres + cambio sale ${formatCLP(cpn)}/nueva — mas barato que ML (${formatCLP(mlPrice.value)})`,
+      text: `Conviene sobres: ${formatCLP(cpn)} vs ${formatCLP(mlPrice.value)} suelta.`,
     };
-  if (ratio < 1.0)
+  }
+  if (ratio < 1.0) {
     return {
       level: 'yellow',
-      text: `Casi igual: ${formatCLP(cpn)}/nueva vs ${formatCLP(mlPrice.value)} en ML`,
+      text: `Parejo: ${formatCLP(cpn)} sobre vs ${formatCLP(mlPrice.value)} suelta.`,
     };
+  }
   return {
     level: 'red',
-    text: `Mejor comprar en ML: sobre sale ${formatCLP(cpn)}/nueva vs ${formatCLP(mlPrice.value)} individual`,
+    text: `Conviene comprar sueltas: ${formatCLP(mlPrice.value)} vs ${formatCLP(cpn)} del sobre.`,
   };
 });
 
@@ -132,8 +179,10 @@ const yTicks = computed(() => {
 
 const xTicks = [0, 100, 200, 300, 400];
 
+// Sin separador de miles. El punto se reserva SOLO para decimales (evitamos
+// el conflicto con 1.045 = mil cuarenta y cinco vs 1.045 = uno coma cero cuatro cinco).
 function formatCLP(n: number): string {
-  return '$' + n.toLocaleString('es-CL');
+  return '$' + Math.round(n);
 }
 </script>
 
@@ -169,9 +218,16 @@ function formatCLP(n: number): string {
         <span class="calc-status-sep">·</span>
         Faltan <strong>{{ missing }}</strong>
       </div>
+
+      <div v-if="K < N" class="calc-expectation">
+        Cada sobre nuevo te da, en promedio,
+        <span class="calc-expectation-val">{{ expectedNewPerPack.toFixed(1) }}</span>
+        láminas nuevas
+        <span class="calc-expectation-pct">({{ newPercentagePerPack }}% del sobre)</span>.
+      </div>
+
       <div class="calc-funfact">
-        Completar el album sin cambiar necesita ~{{ totalFromZero.toLocaleString('es-CL') }} sobres
-        en promedio
+        Llenar todo solo con sobres necesitaría ~{{ totalFromZero }} en promedio.
       </div>
     </div>
 
@@ -195,7 +251,7 @@ function formatCLP(n: number): string {
       </div>
 
       <div class="calc-input-row">
-        <label class="calc-input-label">Personas con las que cambio: {{ tradePeople }}</label>
+        <label class="calc-input-label">Personas con las que cambias: {{ tradePeople }}</label>
         <div class="calc-slider-row">
           <input
             v-model.number="tradePeople"
@@ -211,46 +267,56 @@ function formatCLP(n: number): string {
 
       <div class="calc-inputs-row">
         <div class="calc-input-row calc-input-half">
-          <label class="calc-input-label">Precio sobre</label>
+          <label class="calc-input-label">Precio del sobre</label>
           <input v-model.number="packPrice" type="number" min="0" class="calc-num" />
         </div>
         <div class="calc-input-row calc-input-half">
-          <label class="calc-input-label">Precio ML individual</label>
+          <label class="calc-input-label">Precio lámina suelta</label>
           <input v-model.number="mlPrice" type="number" min="0" class="calc-num" />
         </div>
       </div>
 
       <div class="calc-results">
         <div class="calc-result">
-          <span class="calc-result-val">{{ sim.newDirect }}</span> nuevas salen de los sobres
+          <span class="calc-result-val">{{ sim.newDirect }}</span> nuevas
+          <span v-if="extraPacks > 0">y {{ sim.dupesGenerated }} repetidas</span>
+          de los sobres
+          <span v-if="extraPacks > 0" class="calc-result-hint">
+            ({{ newPctFromPacks }}% nuevas)
+          </span>
         </div>
         <div v-if="sim.newFromTrade > 0" class="calc-result">
           <span class="calc-result-val calc-result-trade">+{{ sim.newFromTrade }}</span>
-          nuevas cambiando repetidas <span class="calc-result-hint">(sin costo extra)</span>
+          nuevas cambiando repetidas
+        </div>
+        <div v-if="sim.newFromTrade > 0 && tradePeople > 0" class="calc-result calc-result-sub">
+          ~<span class="calc-result-val">{{ tradesPerPerson }}</span>
+          por persona en promedio.
         </div>
         <div class="calc-result">
-          Llegaras a <span class="calc-result-val">{{ sim.totalFinal }}</span>
+          Total: <span class="calc-result-val">{{ sim.totalFinal }}</span>
           <span class="calc-result-pct">({{ sim.pctFinal }}%)</span>
         </div>
 
-        <div class="calc-divider" />
+        <template v-if="extraPacks > 0">
+          <div class="calc-divider" />
 
-        <div class="calc-result">
-          Gastas <span class="calc-result-val">{{ formatCLP(sim.totalCost) }}</span> en sobres
-        </div>
-        <div class="calc-result">
-          Cada lamina nueva te sale
-          <span class="calc-result-val">{{
-            formatCLP(tradePeople > 0 ? sim.costPerNewReal : sim.costPerNewNaive)
-          }}</span>
-          <template v-if="tradePeople > 0">
-            <span class="calc-result-hint"
-              >(seria {{ formatCLP(sim.costPerNewNaive) }} sin cambiar repes)</span
-            >
-          </template>
-        </div>
+          <div class="calc-result">
+            Gastas <span class="calc-result-val">{{ formatCLP(sim.totalCost) }}</span> en sobres
+          </div>
+          <div v-if="sim.newTotal > 0" class="calc-result">
+            Costo por lámina nueva:
+            <span class="calc-result-val">{{
+              formatCLP(tradePeople > 0 ? sim.costPerNewReal : sim.costPerNewNaive)
+            }}</span>
+            <span v-if="tradePeople > 0 && sim.newDirect > 0" class="calc-result-hint">
+              (sin cambiar repetidas: {{ formatCLP(sim.costPerNewNaive) }})
+            </span>
+          </div>
+        </template>
+
         <div v-if="sim.dupesDead > 0" class="calc-result calc-result-dead">
-          {{ sim.dupesDead }} repetidas quedarian sin cambiar
+          ~{{ sim.dupesDead }} repetidas quedarían sin cambiar.
         </div>
       </div>
 
@@ -261,14 +327,14 @@ function formatCLP(n: number): string {
 
     <!-- Tabla -->
     <div class="calc-card">
-      <div class="calc-label">PROYECCION (SOLO SOBRES)</div>
+      <div class="calc-label">PROYECCIÓN (SOLO SOBRES)</div>
       <div class="calc-table-wrap">
         <table class="calc-table">
           <thead>
             <tr>
               <th>Sobres</th>
               <th>Nuevas</th>
-              <th>Repes</th>
+              <th>Repetidas</th>
               <th>Total</th>
               <th>%</th>
               <th>$/nueva</th>
@@ -355,29 +421,33 @@ function formatCLP(n: number): string {
       </div>
     </div>
 
-    <!-- Acordeon matematica -->
+    <!-- Acordeon estadistica -->
     <details class="calc-math">
-      <summary class="calc-math-toggle">Ver matematica detras</summary>
+      <summary class="calc-math-toggle">Cómo se calcula</summary>
       <div class="calc-math-body">
         <p>
-          <strong>Laminas nuevas esperadas:</strong><br />
-          nuevas = (N - K) * [1 - (1 - 1/N)^(s*k)]<br />
-          N={{ N }} laminas en el album, K=las que tienes, s=sobres, k=7 por sobre.
+          Son cálculos de probabilidad (no fórmulas exactas). Asumen que cada sobre trae 7 láminas
+          al azar de las {{ N }} posibles, con repetición.
+        </p>
+        <p>
+          <strong>Nuevas esperadas en s sobres:</strong><br />
+          nuevas = (N − K) · [1 − (1 − 1/N)^(s·k)]<br />
+          N = {{ N }}, K = las que ya tienes, s = sobres, k = 7.
         </p>
         <p>
           <strong>Nuevas por cambio:</strong><br />
-          nuevas_cambio = min(R * tau * rho, faltantes restantes)<br />
-          R=repetidas totales, tau=tasa de cambio, rho=0.8 (ratio nuevas/repe).
+          nuevas_cambio = mín(R · τ · ρ, faltantes restantes)<br />
+          R = repetidas totales, τ = qué fracción logras cambiar (sube con más contactos), ρ = 0,8
+          (de cada repetida cambiada, el 80% termina siendo nueva para ti).
         </p>
         <p>
-          <strong>Costo por lamina nueva:</strong><br />
-          $/nueva = precio_sobre / nuevas_en_1_sobre<br />
-          Con cambio: costo_total / (nuevas_directas + nuevas_cambio)
+          <strong>Costo por lámina nueva:</strong><br />
+          costo total ÷ (nuevas de sobres + nuevas por cambio).
         </p>
         <p>
-          <strong>Sobres para llenar desde cero:</strong><br />
-          total = N * H_N / k, donde H_N es el N-esimo numero armonico.<br />
-          Para {{ N }} laminas: ~{{ totalFromZero.toLocaleString('es-CL') }} sobres.
+          <strong>Sobres para completar desde cero:</strong><br />
+          total = N · H_N ÷ k, donde H_N es la suma 1 + 1/2 + … + 1/N (número armónico).<br />
+          Para {{ N }} láminas: ~{{ totalFromZero }} sobres.
         </p>
       </div>
     </details>
@@ -449,6 +519,28 @@ function formatCLP(n: number): string {
   color: rgba(246, 241, 225, 0.4);
   margin-top: 8px;
   letter-spacing: 0.02em;
+}
+
+/* Esperanza por sobre */
+.calc-expectation {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(232, 179, 65, 0.06);
+  border-left: 2px solid var(--gold);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--chalk);
+  line-height: 1.4;
+}
+.calc-expectation-val {
+  font-family: var(--display);
+  font-size: 18px;
+  color: var(--gold);
+  margin: 0 2px;
+}
+.calc-expectation-pct {
+  color: rgba(246, 241, 225, 0.55);
+  font-size: 12px;
 }
 
 /* Inputs */
@@ -530,6 +622,12 @@ function formatCLP(n: number): string {
 .calc-result-hint {
   font-size: 11px;
   color: rgba(246, 241, 225, 0.35);
+}
+.calc-result-sub {
+  font-size: 11px;
+  color: rgba(246, 241, 225, 0.5);
+  padding-left: 12px;
+  margin-top: -2px;
 }
 .calc-divider {
   height: 1px;
