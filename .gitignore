@@ -29,6 +29,10 @@ test-results
 
 # Mock data (local dev only)
 mock-data.json
+.mock-data-backup.json
+
+# Local-only assets
+demo.mp4
 
 # Claude Code
 .claude/

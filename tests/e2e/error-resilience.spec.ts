@@ -73,12 +73,12 @@ test.describe('Error Resilience', () => {
   });
 
   test.describe('500 — server error: sticker queues for retry, no revert', () => {
-    test('500 on sticker POST queues op, optimistic stays, sync-status banner shows', async ({
+    test('500 on sticker POST queues op, optimistic stays, sync-toast shows', async ({
       page,
     }) => {
       // Nueva politica: en error transitorio del servidor, el sticker queda
       // marcado (optimistic) y la op va a la sync queue para retry. El usuario
-      // ve el banner `.sync-status` (pending o failed), no `.sync-error`.
+      // ve el banner `.sync-toast` (pending o failed), no `.sync-error`.
       await setupSupabaseRoutes(page, {
         authenticated: true,
         profile: TEST_PROFILE,
@@ -100,13 +100,17 @@ test.describe('Error Resilience', () => {
       await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 5000 });
 
       // El banner de sync queue aparece (pending o failed)
-      await expect(page.locator('.sync-status')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('.sync-toast')).toBeVisible({ timeout: 15000 });
 
       // Indicador de sync en la lamina (pending o failed)
       await expect(firstSticker.locator('.stk-sync-dot')).toBeVisible({ timeout: 5000 });
     });
 
-    test('500 on section complete reverts all stickers', async ({ page }) => {
+    test('500 on section complete queues stickers individually — optimistic stays', async ({
+      page,
+    }) => {
+      // Nueva politica: bulk falla → encolar cada sticker individualmente.
+      // Optimistic se mantiene, aparece el banner de sync queue (no .sync-error).
       await setupSupabaseRoutes(page, {
         authenticated: true,
         profile: TEST_PROFILE,
@@ -124,11 +128,12 @@ test.describe('Error Resilience', () => {
       // Click "Completar"
       await page.click('.complete-btn');
 
-      // Should show error and revert
-      await expect(page.locator('.sync-error')).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('.acc-team-count').first()).toContainText('0/20', {
+      // Optimistic se mantiene (20 stickers marcados)
+      await expect(page.locator('.acc-team-count').first()).toContainText('20/20', {
         timeout: 5000,
       });
+      // Banner de sync queue aparece
+      await expect(page.locator('.sync-toast')).toBeVisible({ timeout: 15000 });
     });
 
     test('500 on initial sticker load shows sync error', async ({ page }) => {
@@ -177,7 +182,7 @@ test.describe('Error Resilience', () => {
       context,
     }) => {
       // Nueva politica: offline durante una accion → la op va a la queue de
-      // sync, el sticker queda marcado y aparece el banner `.sync-status`.
+      // sync, el sticker queda marcado y aparece el banner `.sync-toast`.
       await setupSupabaseRoutes(page, {
         authenticated: true,
         profile: TEST_PROFILE,
@@ -200,7 +205,7 @@ test.describe('Error Resilience', () => {
       await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 5000 });
 
       // Banner de sync queue aparece.
-      await expect(page.locator('.sync-status')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('.sync-toast')).toBeVisible({ timeout: 15000 });
     });
 
     test('offline error: sticker keeps optimistic + pending sync indicator', async ({
