@@ -394,8 +394,8 @@ function onPointerCancel() {
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4);
 }
 .stk-sync-pending {
-  background: #f5a524;
-  animation: stk-sync-pulse 1.4s ease-in-out infinite;
+  background: var(--mint);
+  animation: stk-sync-pulse 0.7s ease-in-out infinite;
 }
 .stk-sync-failed {
   background: #e25a3a;

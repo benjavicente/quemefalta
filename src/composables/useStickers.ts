@@ -50,6 +50,32 @@ function defaultState(): StickerState {
   return { owned: false, dupes: 0, note: '' };
 }
 
+// Traduce errores de Supabase/red a mensajes legibles para el usuario.
+// El mensaje tecnico queda en console (desarrollador) — el banner muestra
+// algo que el usuario puede entender. Una sola fuente de mensajes amables.
+function friendlyErrorMessage(err: { message?: string; code?: string } | null): string {
+  if (!err) return 'Error al guardar';
+  const msg = (err.message ?? '').toLowerCase();
+  const code = (err.code ?? '').toLowerCase();
+  if (code === 'timeout' || msg.includes('tardando') || msg.includes('timeout')) {
+    return 'Tardando en sincronizar';
+  }
+  if (msg.includes('sin conexión') || msg.includes('fetch') || msg.includes('network')) {
+    return 'Sin conexión';
+  }
+  if (msg.includes('conexión lenta') || msg.includes('lenta')) {
+    return 'Conexión lenta';
+  }
+  if (msg.includes('row-level security') || msg.includes('permission')) {
+    return 'Sin permisos para esta acción';
+  }
+  if (code === 'session_dead' || msg.includes('sesión expirada')) {
+    return 'Sesión expirada. Recarga la página.';
+  }
+  if (code.startsWith('5')) return 'Error del servidor';
+  return 'Error al guardar';
+}
+
 // === DB WRITE HELPER ===
 // Realiza el upsert/delete real al servidor. Usado tanto por setSticker (primer
 // intento) como por la queue de retry.
@@ -81,6 +107,60 @@ async function writeStickerToDb(
 }
 
 // === SYNC QUEUE MANAGEMENT ===
+
+// Verifica TODOS los ops de la queue (pending + failed) contra el server en
+// una sola query. Los que ya estan guardados se limpian silenciosamente.
+// Caso comun: red lenta → server procesa write pero cliente recibe timeout.
+// Sin esto, la queue sigue reintentando ops que ya estan en DB.
+async function reconcilePendingOps() {
+  const { user } = useAuth();
+  if (!user.value) return;
+
+  const ops = [...pendingOps.value.values()];
+  if (ops.length === 0) return;
+
+  const stickerNumbers = ops.map((op) => op.stickerNumber);
+  const { data, error } = await withAuthRetry(() =>
+    supabase
+      .from('stickers')
+      .select('sticker_number, owned, dupes, note')
+      .eq('user_id', user.value!.id)
+      .in('sticker_number', stickerNumbers),
+  );
+  if (error || !Array.isArray(data)) return;
+
+  // Indexar server state por sticker_number. Los que no aparezcan en data
+  // significa que en el server NO hay row (estado default).
+  const serverByNum = new Map<number, StickerState>();
+  for (const row of data as {
+    sticker_number: number;
+    owned: boolean;
+    dupes: number | null;
+    note: string | null;
+  }[]) {
+    serverByNum.set(row.sticker_number, {
+      owned: row.owned,
+      dupes: row.dupes ?? 0,
+      note: row.note ?? '',
+    });
+  }
+
+  let anyChanged = false;
+  for (const op of ops) {
+    const serverState = serverByNum.get(op.stickerNumber) ?? defaultState();
+    if (isSameState(serverState, op.targetState)) {
+      console.log(`[SyncQueue] ${op.stickerNumber} verified on server — cleaning`);
+      pendingOps.value.delete(op.stickerNumber);
+      anyChanged = true;
+    }
+  }
+
+  if (anyChanged) {
+    pendingOps.value = new Map(pendingOps.value);
+    persistQueue();
+    scheduleNextRetry();
+  }
+}
 
 function queueStorageKey(userId: string): string {
   return `quemefalta_sync_${userId}`;
@@ -169,14 +249,45 @@ async function runDueRetries() {
     return;
   }
 
-  console.log(`[SyncQueue] retrying ${due.length} ops`);
+  // ANTES de gastar tiempo reintentando 1 por 1 (cada uno potencialmente 8s
+  // de timeout), verificar 1 vez en batch contra el server. Caso comun:
+  // server proceso el write pero el cliente recibio timeout — la data YA
+  // esta guardada. Sin esto, retries timeoutean innecesariamente.
+  await reconcilePendingOps();
+
+  // Re-filtrar despues del reconcile — algunos ops pueden haber sido limpiados.
+  const stillDue = due.filter((op) => pendingOps.value.has(op.stickerNumber));
+  if (stillDue.length === 0) {
+    scheduleNextRetry();
+    return;
+  }
+
+  console.log(`[SyncQueue] retrying ${stillDue.length} ops`);
 
   let anyChanged = false;
-  for (const op of due) {
-    const error = await writeStickerToDb(user.value.id, op.stickerNumber, op.targetState);
+  for (const op of stillDue) {
+    // Snapshot del target ANTES del write — si el usuario lo cambia durante el
+    // await (via setSticker), op.targetState ya tendra el nuevo valor cuando
+    // volvamos. Necesitamos comparar para no perder la actualizacion.
+    const targetSnapshot: StickerState = { ...op.targetState };
+    const error = await writeStickerToDb(user.value.id, op.stickerNumber, targetSnapshot);
     if (!error) {
-      console.log(`[SyncQueue] ✓ ${op.stickerNumber} after ${op.attempts} attempts`);
-      pendingOps.value.delete(op.stickerNumber);
+      // Re-leer el op del map (puede haber sido reemplazado en pendingOps por enqueueOp).
+      const current = pendingOps.value.get(op.stickerNumber);
+      if (current && !isSameState(current.targetState, targetSnapshot)) {
+        // El usuario actualizo el target DURANTE el write. No borrar — dejar
+        // que el proximo retry escriba el target nuevo.
+        console.log(
+          `[SyncQueue] ${op.stickerNumber} success but target changed; keeping for retry`,
+        );
+        current.attempts = 0;
+        current.lastAttemptAt = Date.now();
+        current.lastError = null;
+        current.status = 'pending';
+      } else {
+        console.log(`[SyncQueue] ✓ ${op.stickerNumber} after ${op.attempts} attempts`);
+        pendingOps.value.delete(op.stickerNumber);
+      }
       anyChanged = true;
     } else {
       op.attempts++;
@@ -197,6 +308,16 @@ async function runDueRetries() {
     pendingOps.value = new Map(pendingOps.value);
     persistQueue();
   }
+
+  // Si algun op transito a failed (agotaron retries), verificar 1 vez mas —
+  // puede que el server lo tenga aunque hayamos recibido timeouts. Al inicio
+  // de runDueRetries ya reconcilamos, pero los failed son finales y vale el
+  // doble-check antes de mostrar "X cambios sin guardar" al usuario.
+  const justFailed = stillDue.some((op) => op.status === 'failed');
+  if (justFailed && pendingOps.value.size > 0) {
+    void reconcilePendingOps();
+  }
+
   scheduleNextRetry();
 }
 
@@ -206,6 +327,9 @@ function enqueueOp(
   prevState: StickerState | undefined,
   errMsg: string,
 ) {
+  // La queue se hace cargo de este sticker → no mostrar el banner generico de
+  // "Error guardando" porque seria redundante con el banner de sync queue.
+  syncError.value = null;
   const existing = pendingOps.value.get(stickerNumber);
   if (existing) {
     // Ya estaba en queue → solo actualizar target. prevState ORIGINAL se mantiene
@@ -267,7 +391,10 @@ function discardAllPending() {
   }
 }
 
-function retryAllPending() {
+async function retryAllPending() {
+  // Verificar primero contra el server: si alguno ya esta guardado, limpiarlo
+  // antes de marcar para retry. Asi evitamos disparar writes innecesarios.
+  await reconcilePendingOps();
   for (const op of pendingOps.value.values()) {
     op.status = 'pending';
     op.lastAttemptAt = 0; // due now
@@ -310,7 +437,7 @@ async function loadStickers(userId: string, force = false) {
 
   if (error) {
     console.error('[useStickers] Load error:', error);
-    syncError.value = error.message;
+    syncError.value = friendlyErrorMessage(error);
     loading.value = false;
     return;
   }
@@ -339,30 +466,49 @@ async function loadStickers(userId: string, force = false) {
   loading.value = false;
 }
 
+function isSameState(a: StickerState, b: StickerState): boolean {
+  return a.owned === b.owned && a.dupes === b.dupes && a.note === b.note;
+}
+
+function applyOptimistic(stickerNumber: number, target: StickerState) {
+  // Si el state es default, borramos la entrada del map (asi
+  // stickers.value[n] === undefined y stats lo cuenta como no-owned).
+  if (!target.owned && target.dupes === 0 && !target.note) {
+    const m = { ...stickers.value };
+    delete m[stickerNumber];
+    stickers.value = m;
+  } else {
+    stickers.value = { ...stickers.value, [stickerNumber]: target };
+  }
+}
+
 // Upsert con optimistic update + sync queue.
-// Si el primer write falla por error transitorio, NO revertimos: encolamos para
-// retry en background. La lamina queda visualmente marcada con su estado nuevo
-// y un indicador de "pendiente" (consumido por la UI via getStickerSyncStatus).
+//
+// SEMANTICA CLAVE: cada tap actualiza la UI inmediatamente, incluso si hay un
+// write en vuelo para la misma lamina. El write en vuelo se reconcilia al
+// terminar — si el optimistic cambió mientras tanto, dispara un write nuevo
+// con el estado final. Asi multiples taps rapidos no se pierden.
+//
+// Si el write falla por error transitorio, NO revertimos: encolamos para
+// retry en background con el estado FINAL (no el inicial), asi la queue
+// siempre tiene el target que el usuario realmente quiere.
 async function setSticker(stickerNumber: number, newState: StickerState, _force = false) {
   const { user } = useAuth();
   if (!user.value) return;
 
-  // Si la lamina ya esta en la sync queue, no hacemos un write nuevo: solo
-  // actualizamos el target de la queue. El background runner se encarga.
-  // prevState ORIGINAL se preserva para que discard pueda revertir al estado
-  // real previo a TODAS las ediciones pendientes sobre esta lamina.
+  // Capturar prev ANTES del optimistic, para revert o para discard de la queue.
+  const previousState = stickers.value[stickerNumber];
+
+  // Optimistic siempre se aplica de inmediato — la UI refleja el ultimo tap.
+  applyOptimistic(stickerNumber, newState);
+
+  // Si la lamina ya esta en la sync queue, solo actualizamos el target.
+  // prevState ORIGINAL se preserva para que discard revierta al estado real
+  // previo a TODAS las ediciones pendientes sobre esta lamina.
   const queued = pendingOps.value.get(stickerNumber);
   if (queued) {
-    // Aplicar optimistic — borrar entrada si default, sino set.
-    if (!newState.owned && newState.dupes === 0 && !newState.note) {
-      const m = { ...stickers.value };
-      delete m[stickerNumber];
-      stickers.value = m;
-    } else {
-      stickers.value = { ...stickers.value, [stickerNumber]: newState };
-    }
     queued.targetState = newState;
-    queued.attempts = 0; // que el proximo runDueRetries lo intente con backoff 2s
+    queued.attempts = 0; // proximo retry con backoff 2s
     queued.lastAttemptAt = Date.now();
     queued.lastError = null;
     queued.status = 'pending';
@@ -372,14 +518,10 @@ async function setSticker(stickerNumber: number, newState: StickerState, _force 
     return;
   }
 
-  // Mutex por sticker. Si hay una operacion en vuelo:
-  // - tap normal (force=false): ignoramos para no romper la UI con doble tap
-  // - undo (force=true): esperamos a que termine la original
-  const existing = inFlight.get(stickerNumber);
-  if (existing) {
-    if (!_force) return;
-    await existing;
-  }
+  // Si hay un write en vuelo, NO empezamos uno nuevo. Cuando el actual termine,
+  // se reconciliara comparando con stickers.value (que ya tiene el optimistic
+  // de este tap). El usuario ve la UI actualizada en todos los taps.
+  if (inFlight.has(stickerNumber)) return;
 
   // Claim el slot
   let opResolve: () => void = () => {};
@@ -388,30 +530,35 @@ async function setSticker(stickerNumber: number, newState: StickerState, _force 
   });
   inFlight.set(stickerNumber, opPromise);
 
-  const previousState = stickers.value[stickerNumber];
-
   try {
     const fresh = await ensureFreshSession();
     if (!fresh) {
-      // sessionDead: la maneja el modal global, no la queue.
+      // sessionDead: revertir optimistic — la dead-modal bloquea el flujo
+      // y queremos UI consistente con DB.
+      if (previousState) {
+        stickers.value = { ...stickers.value, [stickerNumber]: previousState };
+      } else {
+        const m = { ...stickers.value };
+        delete m[stickerNumber];
+        stickers.value = m;
+      }
       syncError.value = 'Sesión expirada. Recarga la página.';
       return;
-    }
-
-    // Optimistic. Si el state es default, borramos la entrada del map (asi
-    // stickers.value[n] === undefined y stats lo cuenta como no-owned).
-    if (!newState.owned && newState.dupes === 0 && !newState.note) {
-      const m = { ...stickers.value };
-      delete m[stickerNumber];
-      stickers.value = m;
-    } else {
-      stickers.value = { ...stickers.value, [stickerNumber]: newState };
     }
 
     const error = await writeStickerToDb(user.value.id, stickerNumber, newState);
 
     if (!error) {
       syncError.value = null;
+      // Reconciliacion: si el usuario cambio el estado durante el write,
+      // disparar otro write con el estado actual.
+      const current = stickers.value[stickerNumber] ?? defaultState();
+      if (!isSameState(current, newState)) {
+        // Re-fire despues del finally (asi inFlight ya esta limpio).
+        queueMicrotask(() => {
+          void setSticker(stickerNumber, current, true);
+        });
+      }
       return;
     }
 
@@ -427,9 +574,11 @@ async function setSticker(stickerNumber: number, newState: StickerState, _force 
       return;
     }
 
-    // Error transitorio (timeout, red, server) → encolar. NO revertimos el optimistic.
-    console.warn(`[setSticker] ${stickerNumber} write failed, enqueuing for retry:`, error.message);
-    enqueueOp(stickerNumber, newState, previousState, error.message);
+    // Error transitorio (timeout, red, server) → encolar con el estado FINAL
+    // (puede haber cambiado durante el write por taps adicionales).
+    const finalTarget = stickers.value[stickerNumber] ?? defaultState();
+    console.warn(`[setSticker] ${stickerNumber} write failed, enqueuing:`, error.message);
+    enqueueOp(stickerNumber, finalTarget, previousState, error.message);
   } finally {
     inFlight.delete(stickerNumber);
     opResolve();
@@ -438,7 +587,8 @@ async function setSticker(stickerNumber: number, newState: StickerState, _force 
 
 // Tap: vacio → owned → ×2 → ×3 (se queda en ×3, para quitar usar modal)
 function cycleSticker(stickerNumber: number, _skipUndo = false) {
-  if (inFlight.has(stickerNumber)) return;
+  // Sin check de inFlight: setSticker maneja la reconciliacion si hay un
+  // write en vuelo. Cada tap actualiza la UI inmediatamente.
   const current = stickers.value[stickerNumber] ?? defaultState();
   const prevState = { ...current };
 
@@ -524,18 +674,15 @@ async function addBatch(stickerNumbers: number[]) {
     );
 
     if (error) {
-      console.error('[useStickers] Batch add error:', error);
-      const revertMap = { ...stickers.value };
-      for (const { num, prev } of toUpsert) {
-        if (prev) {
-          revertMap[num] = prev;
-        } else {
-          delete revertMap[num];
-        }
+      console.error('[useStickers] Batch add error, enqueuing individually:', error);
+      // Bulk fallo (probable timeout por payload grande). NO revertimos — encolamos
+      // cada sticker individualmente para que la queue los retry uno por uno.
+      // Writes individuales suelen pasar aunque el bulk timeoutee.
+      for (const { num, prev, newState } of toUpsert) {
+        enqueueOp(num, newState, prev, error.message);
       }
-      stickers.value = revertMap;
-      syncError.value = error.message;
-      return 0;
+      syncError.value = null; // queue toma el control
+      return toUpsert.length;
     }
 
     syncError.value = null;
@@ -595,17 +742,13 @@ async function markSectionComplete(startsAt: number, count: number) {
     );
 
     if (error) {
-      console.error('[useStickers] Bulk upsert error:', error);
-      const revertMap = { ...stickers.value };
-      for (const { num, prev } of toInsert) {
-        if (prev) {
-          revertMap[num] = prev;
-        } else {
-          delete revertMap[num];
-        }
+      console.error('[useStickers] Bulk upsert error, enqueuing individually:', error);
+      // Bulk fallo (probable timeout). NO revertimos — encolamos cada sticker
+      // individualmente. Writes individuales pasan aunque el bulk timeoutee.
+      for (const { num, prev, note } of toInsert) {
+        enqueueOp(num, { owned: true, dupes: 0, note }, prev, error.message);
       }
-      stickers.value = revertMap;
-      syncError.value = error.message;
+      syncError.value = null;
       return;
     }
 
@@ -642,7 +785,7 @@ async function markSectionComplete(startsAt: number, count: number) {
         );
         if (delErr) {
           console.error('[useStickers] Undo delete error:', delErr);
-          syncError.value = delErr.message;
+          syncError.value = friendlyErrorMessage(delErr);
         }
       }
       if (toRestore.length > 0) {
@@ -658,7 +801,7 @@ async function markSectionComplete(startsAt: number, count: number) {
         );
         if (upErr) {
           console.error('[useStickers] Undo upsert error:', upErr);
-          syncError.value = upErr.message;
+          syncError.value = friendlyErrorMessage(upErr);
         }
       }
     });
@@ -702,13 +845,13 @@ async function clearSection(startsAt: number, count: number) {
     );
 
     if (error) {
-      console.error('[useStickers] Bulk delete error:', error);
-      const revertMap = { ...stickers.value };
+      console.error('[useStickers] Bulk delete error, enqueuing individually:', error);
+      // Bulk fallo. NO revertimos — encolamos cada sticker con target=default
+      // (que writeStickerToDb traduce a DELETE individual).
       for (const { num, prev } of toRemove) {
-        revertMap[num] = prev;
+        enqueueOp(num, defaultState(), prev, error.message);
       }
-      stickers.value = revertMap;
-      syncError.value = error.message;
+      syncError.value = null;
     } else {
       syncError.value = null;
     }
@@ -795,9 +938,21 @@ async function importBulk(data: Map<number, number>, mode: 'replace' | 'merge'):
   // Optimistic update
   stickers.value = newMap;
 
-  const revert = () => {
-    stickers.value = snapshot;
-  };
+  // En caso de fallo: en lugar de revertir TODO el import, encolamos cada
+  // cambio individualmente — la queue los reintenta y el optimistic se mantiene.
+  function enqueueAllFromImport(errMsg: string) {
+    for (const row of upsertRows) {
+      enqueueOp(
+        row.sticker_number,
+        { owned: row.owned, dupes: row.dupes, note: row.note ?? '' },
+        snapshot[row.sticker_number],
+        errMsg,
+      );
+    }
+    for (const num of deleteNums) {
+      enqueueOp(num, defaultState(), snapshot[num], errMsg);
+    }
+  }
 
   try {
     if (upsertRows.length > 0) {
@@ -805,10 +960,10 @@ async function importBulk(data: Map<number, number>, mode: 'replace' | 'merge'):
         supabase.from('stickers').upsert(upsertRows, { onConflict: 'user_id,sticker_number' }),
       );
       if (error) {
-        console.error('[useStickers] importBulk upsert error:', error);
-        revert();
-        syncError.value = error.message;
-        return 0;
+        console.error('[useStickers] importBulk upsert error, enqueuing individually:', error);
+        enqueueAllFromImport(error.message);
+        syncError.value = null;
+        return changed;
       }
     }
 
@@ -821,10 +976,13 @@ async function importBulk(data: Map<number, number>, mode: 'replace' | 'merge'):
           .in('sticker_number', deleteNums),
       );
       if (error) {
-        console.error('[useStickers] importBulk delete error:', error);
-        revert();
-        syncError.value = error.message;
-        return 0;
+        console.error('[useStickers] importBulk delete error, enqueuing individually:', error);
+        // Solo encolamos los deletes (los upserts ya pasaron si llegamos aca).
+        for (const num of deleteNums) {
+          enqueueOp(num, defaultState(), snapshot[num], error.message);
+        }
+        syncError.value = null;
+        return changed;
       }
     }
 
@@ -837,7 +995,7 @@ async function importBulk(data: Map<number, number>, mode: 'replace' | 'merge'):
 
 // Botón "−": baja dupes de a 1, si es ×1 quita la lámina
 function decrementSticker(stickerNumber: number) {
-  if (inFlight.has(stickerNumber)) return;
+  // Sin check de inFlight: setSticker reconcilia si hay un write en vuelo.
   const current = stickers.value[stickerNumber] ?? defaultState();
   if (!current.owned) return;
   const prevState = { ...current };

@@ -104,7 +104,7 @@ async function refreshOnce(): Promise<{ ok: boolean; error: AuthErr }> {
       console.warn('[Supabase] refreshSession timeout >', REFRESH_TIMEOUT_MS, 'ms');
       resolve({
         ok: false,
-        error: { message: 'refresh timeout', name: 'TimeoutError' },
+        error: { message: 'Conexión lenta', name: 'TimeoutError' },
       });
     }, REFRESH_TIMEOUT_MS);
   });
@@ -115,10 +115,10 @@ async function refreshOnce(): Promise<{ ok: boolean; error: AuthErr }> {
         try {
           const { error } = await supabase.auth.refreshSession();
           return { ok: !error, error: error ?? null };
-        } catch (e) {
+        } catch {
           return {
             ok: false as const,
-            error: { message: (e as Error)?.message ?? 'refresh threw', name: 'NetworkError' },
+            error: { message: 'Sin conexión', name: 'NetworkError' },
           };
         }
       })(),
@@ -172,6 +172,16 @@ export async function tryRescueSession(): Promise<boolean> {
   }
   // Sigue siendo transitorio. Lo dejamos dead, el usuario puede volver a intentar.
   return false;
+}
+
+// "Rehacer conexiones" sin recargar la pagina: fuerza un refresh de sesion
+// (re-lee localStorage, obtiene access_token nuevo, limpia cache stale del
+// cliente). Es lo que efectivamente hace recargar la pagina, pero sin perder
+// el state in-memory. Devuelve true si el refresh tuvo exito, false si fue
+// permanente (refresh_token invalido) o si se agotaron los reintentos transient.
+export async function reestablishConnection(): Promise<boolean> {
+  if (useMock) return true;
+  return refreshSession();
 }
 
 if (!useMock) {
@@ -242,7 +252,7 @@ async function withTimeout<T>(
       console.warn('[Supabase] Query timeout >', QUERY_TIMEOUT_MS, 'ms');
       resolve({
         data: null as T,
-        error: { message: 'Request timeout', code: 'timeout', name: 'TimeoutError' },
+        error: { message: 'Tardando en sincronizar', code: 'timeout', name: 'TimeoutError' },
       });
     }, QUERY_TIMEOUT_MS);
   });

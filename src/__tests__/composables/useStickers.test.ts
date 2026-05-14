@@ -82,7 +82,8 @@ describe('useStickers', () => {
         expect(loading.value).toBe(false);
       });
 
-      expect(syncError.value).toBe('Network error');
+      // Mensajes tecnicos del servidor se traducen a friendly via friendlyErrorMessage.
+      expect(syncError.value).toBe('Sin conexión');
     });
   });
 
@@ -182,24 +183,26 @@ describe('useStickers', () => {
   });
 
   describe('inFlight guard', () => {
-    it('ignores concurrent operations on same sticker', async () => {
+    it('rapid taps update optimistic — second tap not silently dropped', async () => {
+      // Nueva politica: cada tap actualiza optimistic incluso si hay un write
+      // en vuelo. setSticker reconcilia al terminar disparando un write nuevo
+      // si el estado cambio.
       setQueryResult({ data: [], error: null });
 
       const { cycleSticker, loaded } = useStickers();
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
-      // Make the upsert hang so the sticker stays in-flight
       setQueryResult({ data: null, error: null });
 
       cycleSticker(42);
-      // Second call while first is in-flight — should be a no-op
+      // Segundo tap inmediato: con la nueva semantica incrementa dupes (no es no-op)
       cycleSticker(42);
       await flushPromises();
 
-      // Sticker should be owned (first cycle: empty→owned), not double-cycled
       const { stickers } = useStickers();
+      // Tap 1: vacio → owned. Tap 2: owned → +1 dupe.
       expect(stickers.value[42]?.owned).toBe(true);
-      expect(stickers.value[42]?.dupes).toBe(0);
+      expect(stickers.value[42]?.dupes).toBe(1);
     });
   });
 
@@ -240,10 +243,12 @@ describe('useStickers', () => {
       expect(supabase.from.mock.calls.length).toBe(callsBefore);
     });
 
-    it('reverts on bulk upsert error', async () => {
+    it('enqueues stickers individually when bulk upsert fails — optimistic stays', async () => {
+      // Nueva politica: el bulk falla pero NO revertimos. Cada sticker queda
+      // encolado individualmente para retry. Optimistic se mantiene en la UI.
       setQueryResult({ data: [], error: null });
 
-      const { stickers, markSectionComplete, loaded, syncError } = useStickers();
+      const { stickers, markSectionComplete, loaded, syncError, pendingCount } = useStickers();
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
       setQueryResult({
@@ -253,11 +258,14 @@ describe('useStickers', () => {
 
       await markSectionComplete(21, 20);
 
-      expect(syncError.value).toBe('Bulk error');
-      // All stickers should be reverted (removed since they didn't exist before)
+      // Sin banner de error — la queue tomo control
+      expect(syncError.value).toBeNull();
+      // Optimistic se mantiene
       for (let i = 21; i <= 40; i++) {
-        expect(stickers.value[i]).toBeUndefined();
+        expect(stickers.value[i]?.owned).toBe(true);
       }
+      // Y cada sticker quedo en la queue
+      expect(pendingCount.value).toBe(20);
     });
   });
 
@@ -279,13 +287,16 @@ describe('useStickers', () => {
       }
     });
 
-    it('reverts on bulk delete error', async () => {
+    it('enqueues stickers individually when bulk delete fails — optimistic stays', async () => {
+      // Nueva politica: bulk delete falla pero NO restauramos los stickers.
+      // Cada uno queda encolado con target=default → la queue dispara DELETEs
+      // individuales que suelen pasar aunque el bulk timeoutee.
       const data = Array.from({ length: 5 }, (_, i) =>
         createStickerDbRow(21 + i, { owned: true, dupes: 0, note: null }),
       );
       setQueryResult({ data, error: null });
 
-      const { stickers, clearSection, loaded, syncError } = useStickers();
+      const { stickers, clearSection, loaded, syncError, pendingCount } = useStickers();
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
       setQueryResult({
@@ -295,11 +306,14 @@ describe('useStickers', () => {
 
       await clearSection(21, 20);
 
-      expect(syncError.value).toBe('Delete error');
-      // Stickers 21-25 should be restored
+      // Sin banner de error — la queue tomo control
+      expect(syncError.value).toBeNull();
+      // Stickers 21-25 ya no estan visibles (optimistic los borro)
       for (let i = 21; i <= 25; i++) {
-        expect(stickers.value[i]?.owned).toBe(true);
+        expect(stickers.value[i]).toBeUndefined();
       }
+      // Cada uno quedo en la queue
+      expect(pendingCount.value).toBe(5);
     });
   });
 
@@ -571,18 +585,23 @@ describe('useStickers', () => {
       expect(stickers.value[0]).toBeUndefined();
     });
 
-    it('reverts on error', async () => {
+    it('enqueues stickers individually when batch fails — optimistic stays', async () => {
       setQueryResult({ data: [], error: null });
 
-      const { stickers, addBatch, loaded, syncError } = useStickers();
+      const { stickers, addBatch, loaded, syncError, pendingCount } = useStickers();
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
       setQueryResult({ data: null, error: { message: 'Batch failed' } });
       await addBatch([1, 2, 3]);
 
-      expect(syncError.value).toBe('Batch failed');
-      expect(stickers.value[1]).toBeUndefined();
-      expect(stickers.value[2]).toBeUndefined();
+      // Sin banner de error — la queue tomo control
+      expect(syncError.value).toBeNull();
+      // Optimistic se mantiene (stickers marcados)
+      expect(stickers.value[1]?.owned).toBe(true);
+      expect(stickers.value[2]?.owned).toBe(true);
+      expect(stickers.value[3]?.owned).toBe(true);
+      // Y los 3 estan en la queue
+      expect(pendingCount.value).toBe(3);
     });
 
     it('returns 0 for empty input', async () => {
@@ -712,10 +731,10 @@ describe('useStickers', () => {
       expect(changed).toBe(0);
     });
 
-    it('reverts on upsert error', async () => {
+    it('enqueues individually when import upsert fails — optimistic stays', async () => {
       setQueryResult({ data: [], error: null });
 
-      const { stickers, importBulk, loaded, syncError } = useStickers();
+      const { stickers, importBulk, loaded, syncError, pendingCount } = useStickers();
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
       setQueryResult({ data: null, error: { message: 'Import failed' } });
@@ -725,8 +744,13 @@ describe('useStickers', () => {
       ]);
       await importBulk(data, 'merge');
 
-      expect(syncError.value).toBe('Import failed');
-      expect(stickers.value[1]).toBeUndefined();
+      // Sin banner de error — la queue tomo control
+      expect(syncError.value).toBeNull();
+      // Optimistic se mantiene (stickers importados visibles)
+      expect(stickers.value[1]?.owned).toBe(true);
+      expect(stickers.value[2]?.owned).toBe(true);
+      // Y estan en la queue
+      expect(pendingCount.value).toBe(2);
     });
 
     it('blocks when session is expired', async () => {
