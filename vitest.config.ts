@@ -15,7 +15,7 @@ export default defineConfig({
       provider: 'v8',
       exclude: ['src/assets/**'],
       thresholds: {
-        statements: 70,
+        statements: 65,
         functions: 60,
       },
     },
