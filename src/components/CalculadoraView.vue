@@ -120,17 +120,21 @@ const recommendation = computed(() => {
   if (cpn === Infinity || cpn === 0) {
     return { level: 'neutral', text: 'Ajusta los valores arriba para ver la comparación.' };
   }
-  const ratio = cpn / mlPrice.value;
-  if (ratio < 0.5) {
-    return {
-      level: 'green',
-      text: `Conviene sobres: ${formatCLP(cpn)} vs ${formatCLP(mlPrice.value)} suelta.`,
-    };
-  }
-  if (ratio < 1.0) {
+  // "Parejo" solo cuando la diferencia ABSOLUTA es chica (< 100 en la moneda).
+  // Usar ratio engaña: $653 sobre vs $1000 suelta es ratio 0.65 pero la diferencia
+  // de $347 por lámina × decenas de láminas es plata real.
+  const diff = mlPrice.value - cpn;
+  const PAREJO_DIFF = 100;
+  if (Math.abs(diff) < PAREJO_DIFF) {
     return {
       level: 'yellow',
       text: `Parejo: ${formatCLP(cpn)} sobre vs ${formatCLP(mlPrice.value)} suelta.`,
+    };
+  }
+  if (diff > 0) {
+    return {
+      level: 'green',
+      text: `Conviene sobres: ${formatCLP(cpn)} vs ${formatCLP(mlPrice.value)} suelta.`,
     };
   }
   return {
