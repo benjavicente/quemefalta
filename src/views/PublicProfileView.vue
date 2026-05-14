@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { supabase, ensureFreshSession } from '@/lib/supabase';
+import { supabase, withAuthRetry } from '@/lib/supabase';
 import { useAuth } from '@/composables/useAuth';
 import { TOTAL_STICKERS, ALBUM_SECTIONS, codeForSticker } from '@/lib/albumData';
 import { useMeta } from '@/composables/useMeta';
@@ -102,7 +102,9 @@ function copyMissing() {
   }
   navigator.clipboard?.writeText(lines.join('\n')).then(() => {
     copied.value = 'Faltantes copiadas';
-    setTimeout(() => { copied.value = ''; }, 2000);
+    setTimeout(() => {
+      copied.value = '';
+    }, 2000);
   });
 }
 
@@ -113,52 +115,59 @@ function copyDupes() {
   }
   navigator.clipboard?.writeText(lines.join('\n')).then(() => {
     copied.value = 'Repetidas copiadas';
-    setTimeout(() => { copied.value = ''; }, 2000);
+    setTimeout(() => {
+      copied.value = '';
+    }, 2000);
   });
 }
 
 onMounted(async () => {
   loading.value = true;
 
-  // Only refresh session if user is logged in — anonymous users can view public profiles too
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (session) {
-    await ensureFreshSession();
+  // Las queries van por withAuthRetry para tener timeout (8s) + retry. Las tablas
+  // son publicas (public_album_stats, public_user_stickers) asi que no requieren
+  // auth — NO llamamos getSession/ensureFreshSession aca para no arriesgar un
+  // hang del cliente Supabase si lleva mucho tiempo idle.
+  const { data, error } = await withAuthRetry(() =>
+    supabase.from('public_album_stats').select('*').eq('username', username.value).maybeSingle(),
+  );
+
+  if (error) {
+    console.error('[PublicProfileView] profile load error:', error);
+    notFound.value = true;
+    loading.value = false;
+    return;
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('public_album_stats')
-      .select('*')
-      .eq('username', username.value)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error loading public profile:', error);
-      notFound.value = true;
-    } else if (!data) {
-      notFound.value = true;
-    } else {
-      profile.value = data as PublicProfile;
-
-      // Fetch individual sticker data for missing/dupes lists
-      const { data: stickers } = await supabase
-        .from('public_user_stickers')
-        .select('sticker_number, owned, dupes')
-        .eq('username', username.value);
-      if (stickers) {
-        const map = new Map<number, { owned: boolean; dupes: number }>();
-        for (const s of stickers) {
-          map.set(s.sticker_number, { owned: s.owned, dupes: s.dupes ?? 0 });
-        }
-        stickerMap.value = map;
-      }
-    }
-  } catch {
-    console.error('Public profile request timed out');
+  if (!data) {
     notFound.value = true;
+    loading.value = false;
+    return;
+  }
+
+  profile.value = data as PublicProfile;
+
+  // Fetch individual sticker data for missing/dupes lists
+  const { data: stickers, error: stickersErr } = await withAuthRetry(() =>
+    supabase
+      .from('public_user_stickers')
+      .select('sticker_number, owned, dupes')
+      .eq('username', username.value),
+  );
+
+  if (stickersErr) {
+    console.error('[PublicProfileView] stickers load error:', stickersErr);
+    // Profile cargado pero stickers fallaron — mostrar el profile sin lista detallada.
+  } else if (Array.isArray(stickers)) {
+    const map = new Map<number, { owned: boolean; dupes: number }>();
+    for (const s of stickers as {
+      sticker_number: number;
+      owned: boolean;
+      dupes: number | null;
+    }[]) {
+      map.set(s.sticker_number, { owned: s.owned, dupes: s.dupes ?? 0 });
+    }
+    stickerMap.value = map;
   }
 
   loading.value = false;
@@ -297,7 +306,9 @@ function compareWithOther() {
           <div class="list-body">
             <div v-for="g in missingBySection" :key="g.section.id" class="list-group">
               <div class="list-group-name">{{ g.section.name }}</div>
-              <div class="list-group-codes">{{ g.items.map((n) => codeForSticker(n)).join(', ') }}</div>
+              <div class="list-group-codes">
+                {{ g.items.map((n) => codeForSticker(n)).join(', ') }}
+              </div>
             </div>
           </div>
         </details>
@@ -311,7 +322,9 @@ function compareWithOther() {
           <div class="list-body">
             <div v-for="g in dupesBySection" :key="g.section" class="list-group">
               <div class="list-group-name">{{ g.section }}</div>
-              <div class="list-group-codes">{{ g.items.map((i) => `${i.code} (×${i.count})`).join(', ') }}</div>
+              <div class="list-group-codes">
+                {{ g.items.map((i) => `${i.code} (×${i.count})`).join(', ') }}
+              </div>
             </div>
           </div>
         </details>
@@ -327,11 +340,7 @@ function compareWithOther() {
         </button>
         <!-- Compare (own profile) -->
         <div v-if="isOwnProfile" class="compare-row">
-          <button
-            v-if="!showCompareInput"
-            class="compare-link"
-            @click="showCompareInput = true"
-          >
+          <button v-if="!showCompareInput" class="compare-link" @click="showCompareInput = true">
             Comparar con otro perfil
           </button>
           <form v-else class="compare-form" @submit.prevent="compareWithOther">
@@ -342,7 +351,9 @@ function compareWithOther() {
               autocomplete="off"
               autocapitalize="off"
             />
-            <button type="submit" class="compare-go" :disabled="!compareInput.trim()">Comparar</button>
+            <button type="submit" class="compare-go" :disabled="!compareInput.trim()">
+              Comparar
+            </button>
           </form>
         </div>
         <template v-else>
@@ -361,11 +372,7 @@ function compareWithOther() {
 
           <!-- Compare with another user -->
           <div class="compare-row">
-            <button
-              v-if="!showCompareInput"
-              class="compare-link"
-              @click="showCompareInput = true"
-            >
+            <button v-if="!showCompareInput" class="compare-link" @click="showCompareInput = true">
               Comparar con otro perfil
             </button>
             <form v-else class="compare-form" @submit.prevent="compareWithOther">
@@ -376,7 +383,9 @@ function compareWithOther() {
                 autocomplete="off"
                 autocapitalize="off"
               />
-              <button type="submit" class="compare-go" :disabled="!compareInput.trim()">Comparar</button>
+              <button type="submit" class="compare-go" :disabled="!compareInput.trim()">
+                Comparar
+              </button>
             </form>
           </div>
         </template>
@@ -734,7 +743,9 @@ details[open] > .list-summary::before {
   cursor: pointer;
   font-family: inherit;
 }
-.compare-btn:hover { background: rgba(232,179,65,0.08); }
+.compare-btn:hover {
+  background: rgba(232, 179, 65, 0.08);
+}
 
 .compare-row {
   margin-top: 10px;
@@ -750,7 +761,9 @@ details[open] > .list-summary::before {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.compare-link:hover { color: var(--pitch); }
+.compare-link:hover {
+  color: var(--pitch);
+}
 .compare-form {
   display: flex;
   gap: 6px;
@@ -765,7 +778,9 @@ details[open] > .list-summary::before {
   border-radius: 6px;
   color: var(--pitch);
 }
-.compare-input::placeholder { color: var(--ink-soft); }
+.compare-input::placeholder {
+  color: var(--ink-soft);
+}
 .compare-go {
   padding: 8px 14px;
   font-family: var(--mono);
@@ -777,7 +792,10 @@ details[open] > .list-summary::before {
   border-radius: 6px;
   cursor: pointer;
 }
-.compare-go:disabled { opacity: 0.4; cursor: default; }
+.compare-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 .footer {
   text-align: center;

@@ -1,5 +1,5 @@
 import { ref, computed, type Ref } from 'vue';
-import { supabase, ensureFreshSession } from '@/lib/supabase';
+import { supabase, withAuthRetry } from '@/lib/supabase';
 import { TOTAL_STICKERS } from '@/lib/albumData';
 import { computeExchange, type StickerMap, type ExchangeResult } from '@/lib/exchangeUtils';
 
@@ -48,23 +48,23 @@ export function useExchange(usernameA: Ref<string>, usernameB: Ref<string>) {
   });
 
   async function fetchProfile(username: string): Promise<PublicProfile | null> {
-    const { data, error: err } = await supabase
-      .from('public_album_stats')
-      .select('*')
-      .eq('username', username)
-      .maybeSingle();
+    const { data, error: err } = await withAuthRetry(() =>
+      supabase.from('public_album_stats').select('*').eq('username', username).maybeSingle(),
+    );
     if (err || !data) return null;
     return data as PublicProfile;
   }
 
   async function fetchStickerMap(username: string): Promise<StickerMap> {
-    const { data } = await supabase
-      .from('public_user_stickers')
-      .select('sticker_number, owned, dupes')
-      .eq('username', username);
+    const { data } = await withAuthRetry(() =>
+      supabase
+        .from('public_user_stickers')
+        .select('sticker_number, owned, dupes')
+        .eq('username', username),
+    );
     const map: StickerMap = new Map();
-    if (data) {
-      for (const s of data) {
+    if (Array.isArray(data)) {
+      for (const s of data as { sticker_number: number; owned: boolean; dupes: number | null }[]) {
         map.set(s.sticker_number, { owned: s.owned, dupes: s.dupes ?? 0 });
       }
     }
@@ -81,12 +81,8 @@ export function useExchange(usernameA: Ref<string>, usernameB: Ref<string>) {
       return;
     }
 
-    // Refresh session if logged in (anonymous users can access too)
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await ensureFreshSession();
-    }
-
+    // Las tablas son publicas y fetchProfile/fetchStickerMap ya usan
+    // withAuthRetry con timeout. No hace falta refrescar la sesion aca.
     try {
       const [pA, pB] = await Promise.all([
         fetchProfile(usernameA.value),
