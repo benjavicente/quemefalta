@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { supabase } from '@/lib/supabase';
+import { supabase, callWithTimeout, withAuthRetry } from '@/lib/supabase';
 
 const router = useRouter();
 const status = ref('Procesando login...');
@@ -29,14 +29,22 @@ onMounted(async () => {
     return;
   }
 
-  // Verificar sesión
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
+  // Verificar sesión — con timeout, si auth-js se cuelga no nos quedamos forever.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sessionResult = await callWithTimeout<any>(
+    () => supabase.auth.getSession(),
+    5000,
+    'getSession',
+  );
+  if (!sessionResult) {
+    status.value = 'Tiempo de espera agotado. Volviendo al login...';
+    setTimeout(() => router.replace('/auth'), 3000);
+    return;
+  }
 
+  const { data: sessionData, error } = sessionResult;
+  const session = sessionData?.session;
   console.log('[AuthCallback] Session:', session);
-  console.log('[AuthCallback] Session error:', error);
 
   if (error) {
     console.error('[AuthCallback] getSession error:', error);
@@ -50,7 +58,18 @@ onMounted(async () => {
     const code = urlParams.get('code');
     if (code) {
       console.log('[AuthCallback] Intentando exchange manual con code');
-      const { data, error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const exchResult = await callWithTimeout<any>(
+        () => supabase.auth.exchangeCodeForSession(code),
+        5000,
+        'exchangeCodeForSession',
+      );
+      if (!exchResult) {
+        status.value = 'Tiempo de espera agotado en exchange. Volviendo al login...';
+        setTimeout(() => router.replace('/auth'), 3000);
+        return;
+      }
+      const { data, error: exchErr } = exchResult;
       console.log('[AuthCallback] Exchange result:', data, exchErr);
       if (exchErr || !data.session) {
         status.value = `Error en exchange: ${exchErr?.message ?? 'sin sesión'}`;
@@ -66,22 +85,29 @@ onMounted(async () => {
   }
 
   // Verificar si necesita onboarding
-  const userId = (await supabase.auth.getUser()).data.user?.id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userResult = await callWithTimeout<any>(() => supabase.auth.getUser(), 5000, 'getUser');
+  const userId = userResult?.data.user?.id;
   if (!userId) {
     status.value = 'No se pudo obtener el user. Volviendo al login...';
     setTimeout(() => router.replace('/auth'), 3000);
     return;
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('onboarded')
-    .eq('id', userId)
-    .single();
+  const { data: profile, error: profErr } = await withAuthRetry(() =>
+    supabase.from('profiles').select('onboarded').eq('id', userId).single(),
+  );
+
+  if (profErr) {
+    console.error('[AuthCallback] profile load error:', profErr);
+    status.value = 'Error al cargar el perfil. Volviendo al login...';
+    setTimeout(() => router.replace('/auth'), 4000);
+    return;
+  }
 
   console.log('[AuthCallback] Profile:', profile);
 
-  if (profile?.onboarded) {
+  if ((profile as { onboarded?: boolean } | null)?.onboarded) {
     router.replace('/album');
   } else {
     router.replace('/onboarding');

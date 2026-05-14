@@ -1,6 +1,6 @@
 import { ref, computed, readonly } from 'vue';
 import type { User } from '@supabase/supabase-js';
-import { supabase, ensureFreshSession } from '@/lib/supabase';
+import { supabase, ensureFreshSession, withAuthRetry, refreshInProgress } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 
 // State global compartido entre todos los componentes que usen useAuth
@@ -10,13 +10,19 @@ const loading = ref(true);
 const initialized = ref(false);
 let initPromise: Promise<void> | null = null;
 
-// Cargar profile desde la DB
+// Cargar profile desde la DB con retry + timeout (via withAuthRetry).
+// Si falla por error transitorio, MANTENEMOS el profile actual en vez de pisarlo
+// con null — un blip de red durante un TOKEN_REFRESHED no debe dejar al usuario
+// "sin perfil" en la UI.
 async function loadProfile(userId: string) {
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  const { data, error } = await withAuthRetry(() =>
+    supabase.from('profiles').select('*').eq('id', userId).single(),
+  );
 
   if (error) {
-    console.error('Error loading profile:', error);
-    profile.value = null;
+    console.error('[useAuth] loadProfile error:', error);
+    // Solo limpiar profile si nunca se cargó. Si ya hay uno, dejarlo intacto.
+    if (!profile.value) profile.value = null;
     return;
   }
 
@@ -54,6 +60,12 @@ async function _doInit() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase.auth.onAuthStateChange(async (event: string, session: any) => {
     if (event === 'INITIAL_SESSION') return;
+
+    // supabase-js elimina la sesion y emite SIGNED_OUT cuando un refresh falla
+    // con error no-retryable. Si ignoramos eso ahora, dejamos a user populado
+    // para que la dead-modal pueda mostrar el flujo de "Reintentar / Recargar"
+    // en vez de tirar al usuario a preview mode sin explicacion.
+    if (event === 'SIGNED_OUT' && refreshInProgress()) return;
 
     user.value = session?.user ?? null;
 

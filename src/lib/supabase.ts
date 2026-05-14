@@ -33,9 +33,7 @@ export const supabase = _client;
 const _sessionDead = ref(false);
 export const sessionDead = readonly(_sessionDead);
 
-const STALE_THRESHOLD = 3 * 60 * 1000; // 3 min idle = refrescar antes de la próxima accion
 let lastRefreshAt = Date.now();
-let lastActivityAt = Date.now();
 
 type AuthErr = { message: string; code?: string; name?: string; status?: number } | null;
 
@@ -85,16 +83,50 @@ function isAuthError(error: AuthErr): boolean {
 
 // === Refresh con backoff para errores de red ===
 
+const REFRESH_TIMEOUT_MS = 5_000;
+
+// supabase-js auto-elimina la sesion y emite SIGNED_OUT cuando un refresh falla con
+// error no-retryable. Eso vacia user.value en useAuth y el app cae a preview mode
+// antes de que podamos setear sessionDead → la dead-modal (que requiere !isPreview)
+// nunca aparece. Marcamos refreshInProgress mientras corre el refresh para que useAuth
+// pueda ignorar ese SIGNED_OUT sintetico y dejar que el flujo de dead-modal/rescue tome
+// la decision de UX.
+let _refreshInProgress = false;
+export const refreshInProgress = () => _refreshInProgress;
+
 async function refreshOnce(): Promise<{ ok: boolean; error: AuthErr }> {
+  // Race el refresh contra un timeout. El cliente Supabase puede colgarse
+  // indefinidamente por bugs internos del LockManager u otros, y no podemos
+  // dejar que un refresh roto bloquee todos los writes.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ ok: false; error: AuthErr }>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn('[Supabase] refreshSession timeout >', REFRESH_TIMEOUT_MS, 'ms');
+      resolve({
+        ok: false,
+        error: { message: 'refresh timeout', name: 'TimeoutError' },
+      });
+    }, REFRESH_TIMEOUT_MS);
+  });
+  _refreshInProgress = true;
   try {
-    const { error } = await supabase.auth.refreshSession();
-    return { ok: !error, error: error ?? null };
-  } catch (e) {
-    // Throw = network/abort. Tratar como transitorio.
-    return {
-      ok: false,
-      error: { message: (e as Error)?.message ?? 'refresh threw', name: 'NetworkError' },
-    };
+    return await Promise.race([
+      (async () => {
+        try {
+          const { error } = await supabase.auth.refreshSession();
+          return { ok: !error, error: error ?? null };
+        } catch (e) {
+          return {
+            ok: false as const,
+            error: { message: (e as Error)?.message ?? 'refresh threw', name: 'NetworkError' },
+          };
+        }
+      })(),
+      timeout,
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    _refreshInProgress = false;
   }
 }
 
@@ -156,28 +188,70 @@ if (!useMock) {
   });
 }
 
-// === Pre-write: refrescar si lleva rato idle ===
+// === Pre-write check ===
+// autoRefreshToken del cliente Supabase ya refresca proactivamente. Aca solo
+// chequeamos sessionDead. NO disparamos refreshes adicionales — son la fuente
+// principal de hangs cuando se acumulan llamadas paralelas contra el lock interno.
 export async function ensureFreshSession(): Promise<boolean> {
   if (useMock) return true;
 
   if (_sessionDead.value) {
-    // Intento de rescate antes de bloquear — un transitorio anterior no debe condenar
-    // a la sesión para siempre.
+    // Intento de rescate antes de bloquear (con timeout interno).
     const rescued = await tryRescueSession();
     if (!rescued) return false;
   }
 
-  const now = Date.now();
-  if (now - lastActivityAt > STALE_THRESHOLD) {
-    const ok = await refreshSession();
-    if (!ok) return false;
-  }
-  lastActivityAt = now;
   return true;
 }
 
 // === Retry helper: ejecuta un write, si falla por auth refresca y reintenta ===
 const MAX_RETRIES = 2;
+const QUERY_TIMEOUT_MS = 8_000;
+
+// Helper generico: aplica timeout a CUALQUIER promesa async. Devuelve `undefined`
+// si timeout, o el valor real si resuelve a tiempo. Sirve para wrappear llamadas
+// auth (getSession, getUser, exchangeCodeForSession) que pueden colgarse por el
+// LockManager interno de auth-js.
+export async function callWithTimeout<T>(
+  fn: () => Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`[Supabase] ${label} timeout > ${ms}ms`);
+      resolve(undefined);
+    }, ms);
+  });
+  try {
+    return await Promise.race([fn(), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+// Race fn() vs timeout — si la query se cuelga (ej: lock del cliente Supabase),
+// no quedamos esperando para siempre con la UI en optimistic sin feedback.
+async function withTimeout<T>(
+  fn: () => PromiseLike<{ data: T; error: AuthErr }>,
+): Promise<{ data: T; error: AuthErr }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ data: T; error: AuthErr }>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn('[Supabase] Query timeout >', QUERY_TIMEOUT_MS, 'ms');
+      resolve({
+        data: null as T,
+        error: { message: 'Request timeout', code: 'timeout', name: 'TimeoutError' },
+      });
+    }, QUERY_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([fn(), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export async function withAuthRetry<T>(
   fn: () => PromiseLike<{ data: T; error: AuthErr }>,
@@ -190,10 +264,9 @@ export async function withAuthRetry<T>(
     }
   }
 
-  const result = await fn();
+  const result = await withTimeout(fn);
 
   if (!result.error) {
-    lastActivityAt = Date.now();
     return result;
   }
 
@@ -210,9 +283,8 @@ export async function withAuthRetry<T>(
       return result;
     }
 
-    const retry = await fn();
+    const retry = await withTimeout(fn);
     if (!retry.error) {
-      lastActivityAt = Date.now();
       return retry;
     }
 
