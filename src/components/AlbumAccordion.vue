@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import SectionView from '@/components/SectionView.vue';
 import { ALBUM_SECTIONS } from '@/lib/albumData';
-import { barColor } from '@/lib/progressColors';
+import { barColor, pctColor } from '@/lib/progressColors';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import { useStickers } from '@/composables/useStickers';
 
@@ -53,6 +53,8 @@ const groupData = computed(() => {
       total: groupTotal,
       pct: groupTotal > 0 ? Math.round((groupOwned / groupTotal) * 100) : 0,
       complete: groupOwned === groupTotal,
+      completedTeams: teams.filter((t) => t.complete).length,
+      totalTeams: teams.length,
     };
   });
 });
@@ -120,6 +122,27 @@ defineExpose({ openSection });
           <span class="acc-team-count" :class="{ 'acc-count-done': introSection.complete }">
             {{ introSection.owned }}/{{ introSection.count }}
           </span>
+          <span
+            class="acc-completed-pill"
+            :style="introSection.complete ? { '--pill-color': pctColor(100) } : undefined"
+            :aria-label="introSection.complete ? 'Sección completa' : 'Sección sin completar'"
+          >
+            <svg
+              v-if="introSection.complete"
+              width="9"
+              height="9"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            {{ introSection.complete ? 1 : 0 }}/1
+          </span>
           <span class="acc-chevron">{{ expandedTeam === 'intro' ? '▾' : '▸' }}</span>
         </div>
       </button>
@@ -146,6 +169,31 @@ defineExpose({ openSection });
         </div>
         <div class="acc-group-right">
           <span class="acc-group-count">{{ gd.owned }}/{{ gd.total }}</span>
+          <span
+            class="acc-completed-pill"
+            :style="
+              gd.completedTeams > 0
+                ? { '--pill-color': pctColor((gd.completedTeams / gd.totalTeams) * 100) }
+                : undefined
+            "
+            :aria-label="`${gd.completedTeams} de ${gd.totalTeams} equipos completos`"
+          >
+            <svg
+              v-if="gd.completedTeams === gd.totalTeams"
+              width="9"
+              height="9"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            {{ gd.completedTeams }}/{{ gd.totalTeams }}
+          </span>
           <span class="acc-chevron">{{ expandedGroup === gd.group ? '▾' : '▸' }}</span>
         </div>
       </button>
@@ -269,6 +317,24 @@ defineExpose({ openSection });
   font-family: var(--mono);
   font-size: 10px;
   color: var(--chalk-dim);
+}
+
+/* Secciones-completas pill (grupos A-L y FWC intro).
+ * Toma color de la escala de progreso pero aplicada al RATIO de la pill
+ * (completedTeams/totalTeams), no al pct de stickers. Sin --pill-color (0/N) → neutro. */
+.acc-completed-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border: 1px solid var(--pill-color, var(--line));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--pill-color, transparent) 12%, transparent);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--pill-color, var(--chalk-dim));
+  white-space: nowrap;
 }
 
 /* Teams container */

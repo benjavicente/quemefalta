@@ -155,3 +155,44 @@ export function stickerNumberFromCode(code: string): number | undefined {
   if (idx < 1 || idx > sec.count) return undefined;
   return sec.startsAt + idx - 1;
 }
+
+// === Section-completion helpers ===
+// "Owned map" = registro mínimo necesario para saber si una lámina está marcada.
+// Usamos un shape estructural en vez de StickerState para que sirva tanto al store
+// local (useStickers) como al perfil público (que recibe filas más chicas).
+type OwnedMap = Record<number, { owned: boolean } | undefined>;
+
+/** True si TODAS las stickers de la sección están owned. */
+export function isSectionComplete(section: AlbumSection, owned: OwnedMap): boolean {
+  for (let i = 0; i < section.count; i++) {
+    if (!owned[section.startsAt + i]?.owned) return false;
+  }
+  return true;
+}
+
+/** Cuántas secciones del álbum (49) están completas. */
+export function completedSectionsCount(owned: OwnedMap): number {
+  let n = 0;
+  for (const sec of ALBUM_SECTIONS) {
+    if (isSectionComplete(sec, owned)) n++;
+  }
+  return n;
+}
+
+/** Ratio de equipos completos en un grupo. Devuelve {completed, total}. */
+export function completedTeamsInGroup(
+  group: string,
+  owned: OwnedMap,
+): { completed: number; total: number } {
+  let completed = 0;
+  let total = 0;
+  for (const sec of ALBUM_SECTIONS) {
+    if (sec.group !== group) continue;
+    total++;
+    if (isSectionComplete(sec, owned)) completed++;
+  }
+  return { completed, total };
+}
+
+/** Total de secciones del álbum (49). Util para el denominador del contador global. */
+export const TOTAL_SECTIONS = ALBUM_SECTIONS.length;

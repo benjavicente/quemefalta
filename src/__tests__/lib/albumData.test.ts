@@ -2,11 +2,21 @@ import { describe, it, expect } from 'vitest';
 import {
   ALBUM_SECTIONS,
   TOTAL_STICKERS,
+  TOTAL_SECTIONS,
   GROUPS,
   sectionForSticker,
   codeForSticker,
   stickerNumberFromCode,
+  isSectionComplete,
+  completedSectionsCount,
+  completedTeamsInGroup,
 } from '@/lib/albumData';
+
+function ownAll(start: number, count: number): Record<number, { owned: boolean }> {
+  const m: Record<number, { owned: boolean }> = {};
+  for (let i = 0; i < count; i++) m[start + i] = { owned: true };
+  return m;
+}
 
 describe('albumData', () => {
   describe('GROUPS', () => {
@@ -190,6 +200,91 @@ describe('albumData', () => {
         const code = codeForSticker(n);
         expect(stickerNumberFromCode(code)).toBe(n);
       }
+    });
+  });
+
+  describe('TOTAL_SECTIONS', () => {
+    it('equals 49 (1 intro + 48 teams)', () => {
+      expect(TOTAL_SECTIONS).toBe(49);
+    });
+  });
+
+  describe('isSectionComplete', () => {
+    const intro = ALBUM_SECTIONS[0]; // FWC, startsAt=1, count=20
+    const mex = ALBUM_SECTIONS.find((s) => s.code === 'MEX')!; // startsAt=21, count=20
+
+    it('returns false when no stickers are owned', () => {
+      expect(isSectionComplete(intro, {})).toBe(false);
+      expect(isSectionComplete(mex, {})).toBe(false);
+    });
+
+    it('returns false when only some stickers are owned', () => {
+      const partial = ownAll(21, 19);
+      expect(isSectionComplete(mex, partial)).toBe(false);
+    });
+
+    it('returns true when every sticker in the section is owned', () => {
+      expect(isSectionComplete(mex, ownAll(21, 20))).toBe(true);
+    });
+
+    it('handles zero-indexed sections (FWC)', () => {
+      // FWC0..FWC19 = stickers 1..20
+      expect(isSectionComplete(intro, ownAll(1, 20))).toBe(true);
+      const missingLast = ownAll(1, 19);
+      expect(isSectionComplete(intro, missingLast)).toBe(false);
+    });
+
+    it('ignores stickers from other sections', () => {
+      // Owning every team sticker doesn't complete the intro
+      const everyTeam = ownAll(21, 960);
+      expect(isSectionComplete(intro, everyTeam)).toBe(false);
+    });
+
+    it('treats dupes-only entries (owned=false) as not complete', () => {
+      const m: Record<number, { owned: boolean }> = {};
+      for (let i = 0; i < 20; i++) m[21 + i] = { owned: false };
+      expect(isSectionComplete(mex, m)).toBe(false);
+    });
+  });
+
+  describe('completedSectionsCount', () => {
+    it('returns 0 for an empty album', () => {
+      expect(completedSectionsCount({})).toBe(0);
+    });
+
+    it('returns 1 when only the intro is complete', () => {
+      expect(completedSectionsCount(ownAll(1, 20))).toBe(1);
+    });
+
+    it('returns 2 when intro + Mexico are complete', () => {
+      expect(completedSectionsCount({ ...ownAll(1, 20), ...ownAll(21, 20) })).toBe(2);
+    });
+
+    it('returns 49 for a fully owned album', () => {
+      expect(completedSectionsCount(ownAll(1, 980))).toBe(49);
+    });
+  });
+
+  describe('completedTeamsInGroup', () => {
+    it('returns 0/4 for an empty group', () => {
+      expect(completedTeamsInGroup('A', {})).toEqual({ completed: 0, total: 4 });
+    });
+
+    it('returns 1/4 when only Mexico (group A, startsAt=21) is complete', () => {
+      expect(completedTeamsInGroup('A', ownAll(21, 20))).toEqual({ completed: 1, total: 4 });
+    });
+
+    it('returns 4/4 when every team in group A is owned (stickers 21..100)', () => {
+      expect(completedTeamsInGroup('A', ownAll(21, 80))).toEqual({ completed: 4, total: 4 });
+    });
+
+    it('returns {completed:0,total:0} for an unknown group', () => {
+      expect(completedTeamsInGroup('Z', ownAll(21, 80))).toEqual({ completed: 0, total: 0 });
+    });
+
+    it('does not count the intro (no group)', () => {
+      // Intro completo no debe sumar a ningún grupo
+      expect(completedTeamsInGroup('A', ownAll(1, 20))).toEqual({ completed: 0, total: 4 });
     });
   });
 });

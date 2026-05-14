@@ -5,7 +5,13 @@ import { useAuth } from '@/composables/useAuth';
 import { useStickers } from '@/composables/useStickers';
 import { tryRescueSession } from '@/lib/supabase';
 import { useMeta } from '@/composables/useMeta';
-import { ALBUM_SECTIONS, TOTAL_STICKERS, sectionForSticker, codeForSticker } from '@/lib/albumData';
+import {
+  ALBUM_SECTIONS,
+  TOTAL_STICKERS,
+  TOTAL_SECTIONS,
+  sectionForSticker,
+  codeForSticker,
+} from '@/lib/albumData';
 import { pctColor } from '@/lib/progressColors';
 import StickerDetailModal from '@/components/StickerDetailModal.vue';
 import ShareModal from '@/components/ShareModal.vue';
@@ -59,6 +65,26 @@ const initialSection = ALBUM_SECTIONS.find((s) => s.id === rawHash)?.id ?? ALBUM
 const activeSection = ref(initialSection);
 const view = ref(initialView);
 
+// Secciones completas (49 totales: FWC + 48 equipos). Reactivo a `stickers`.
+// Calculamos la lista una sola vez para que tanto el contador como el tooltip
+// lean del mismo computed (sin re-iterar 49×20 stickers dos veces).
+// Formato: equipos prefijados con su grupo "(A) México"; FWC sin prefijo.
+const completedSectionNames = computed(() => {
+  const labels: string[] = [];
+  for (const sec of ALBUM_SECTIONS) {
+    let done = true;
+    for (let i = 0; i < sec.count; i++) {
+      if (!stickers.value[sec.startsAt + i]?.owned) {
+        done = false;
+        break;
+      }
+    }
+    if (done) labels.push(sec.group ? `(${sec.group}) ${sec.name}` : sec.name);
+  }
+  return labels;
+});
+const completedSections = computed(() => completedSectionNames.value.length);
+
 function setView(v: 'album' | 'missing' | 'dupes' | 'calc') {
   view.value = v;
   if (v === 'album') {
@@ -88,6 +114,7 @@ const showScanner = ref(false);
 const showCsvModal = ref(false);
 const showProfileMenu = ref(false);
 const showLoginPrompt = ref(false);
+const showPagesPopover = ref(false);
 const sectionSearch = ref('');
 
 // Undo toast state
@@ -321,7 +348,13 @@ const userInitial = computed(() => {
 </script>
 
 <template>
-  <div class="app" @click="showProfileMenu = false">
+  <div
+    class="app"
+    @click="
+      showProfileMenu = false;
+      showPagesPopover = false;
+    "
+  >
     <!-- HEADER (simplified) -->
     <header class="hdr">
       <div class="hdr-left">
@@ -440,7 +473,11 @@ const userInitial = computed(() => {
     </div>
 
     <!-- SYNC ERROR (non-fatal) -->
-    <div v-if="syncError && !sessionDead && !isPreview" class="sync-error" role="alert">
+    <div
+      v-if="syncError && pendingCount === 0 && failedCount === 0 && !sessionDead && !isPreview"
+      class="sync-error"
+      role="alert"
+    >
       <svg
         width="14"
         height="14"
@@ -459,26 +496,33 @@ const userInitial = computed(() => {
       Error guardando: {{ syncError }}
     </div>
 
-    <!-- SYNC QUEUE STATUS -->
-    <div
-      v-if="(pendingCount > 0 || failedCount > 0) && !sessionDead && !isPreview"
-      class="sync-status"
-      :class="failedCount > 0 ? 'sync-status-failed' : 'sync-status-pending'"
-      role="status"
-    >
-      <span class="sync-status-text">
-        <span v-if="failedCount > 0">
-          {{ failedCount }} cambio{{ failedCount === 1 ? '' : 's' }} sin guardar
+    <!-- SYNC QUEUE STATUS (toast flotante tipo UndoToast) -->
+    <Transition name="sync-toast">
+      <div
+        v-if="(pendingCount > 0 || failedCount > 0) && !sessionDead && !isPreview"
+        class="sync-toast"
+        :class="failedCount > 0 ? 'sync-toast-failed' : 'sync-toast-pending'"
+        role="status"
+      >
+        <span class="sync-toast-dot" />
+        <span class="sync-toast-msg">
+          <span v-if="failedCount > 0">
+            {{ failedCount }} cambio{{ failedCount === 1 ? '' : 's' }} sin guardar
+          </span>
+          <span v-else-if="pendingCount > 0">
+            Guardando {{ pendingCount }} cambio{{ pendingCount === 1 ? '' : 's' }}...
+          </span>
         </span>
-        <span v-else-if="pendingCount > 0">
-          Guardando {{ pendingCount }} cambio{{ pendingCount === 1 ? '' : 's' }}...
-        </span>
-      </span>
-      <div v-if="failedCount > 0" class="sync-status-actions">
-        <button class="sync-btn sync-btn-retry" @click="retryAllPending">Reintentar</button>
-        <button class="sync-btn sync-btn-discard" @click="discardAllPending">Descartar</button>
+        <div v-if="failedCount > 0" class="sync-toast-actions">
+          <button class="sync-toast-btn sync-toast-btn-retry" @click="retryAllPending">
+            REINTENTAR
+          </button>
+          <button class="sync-toast-btn sync-toast-btn-discard" @click="discardAllPending">
+            DESCARTAR
+          </button>
+        </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- PREVIEW BANNER -->
     <div v-if="isPreview" class="preview-banner">
@@ -512,14 +556,82 @@ const userInitial = computed(() => {
           </div>
           <div class="progress-side">
             <div class="progress-stat">
-              <div class="progress-stat-num">{{ stats.missing }}</div>
-              <div class="progress-stat-lbl">FALTAN</div>
+              <button
+                type="button"
+                class="progress-stat-btn"
+                aria-label="Ver láminas faltantes"
+                @click="setView('missing')"
+              >
+                <div class="progress-stat-num">{{ stats.missing }}</div>
+                <div class="progress-stat-lbl">FALTAN</div>
+              </button>
             </div>
             <div class="progress-stat">
-              <div class="progress-stat-num" :class="{ 'progress-stat-coral': stats.dupes > 0 }">
-                {{ stats.dupes }}
+              <button
+                type="button"
+                class="progress-stat-btn"
+                aria-label="Ver láminas repetidas"
+                @click="setView('dupes')"
+              >
+                <div class="progress-stat-num" :class="{ 'progress-stat-coral': stats.dupes > 0 }">
+                  {{ stats.dupes }}
+                </div>
+                <div class="progress-stat-lbl">REP.</div>
+              </button>
+            </div>
+            <div class="progress-stat progress-stat-pages">
+              <button
+                type="button"
+                class="progress-stat-btn"
+                :aria-expanded="showPagesPopover"
+                aria-label="Ver páginas completadas"
+                @click.stop="showPagesPopover = !showPagesPopover"
+                @keydown.escape="showPagesPopover = false"
+              >
+                <div
+                  class="progress-stat-num"
+                  :class="{ 'progress-stat-mint': completedSections === TOTAL_SECTIONS }"
+                >
+                  {{ completedSections }}/{{ TOTAL_SECTIONS }}
+                </div>
+                <div class="progress-stat-lbl">PÁGINAS</div>
+              </button>
+              <div
+                v-if="showPagesPopover"
+                class="pages-popover"
+                role="dialog"
+                aria-label="Páginas completadas"
+                @click.stop
+              >
+                <div class="pages-popover-head">
+                  Páginas completas
+                  <span class="pages-popover-count">
+                    {{ completedSections }}/{{ TOTAL_SECTIONS }}
+                  </span>
+                </div>
+                <p v-if="completedSectionNames.length === 0" class="pages-popover-empty">
+                  Todavía no completaste ninguna página. Marca todas las láminas de un equipo para
+                  que aparezca acá.
+                </p>
+                <ul v-else class="pages-popover-list">
+                  <li v-for="name in completedSectionNames" :key="name" class="pages-popover-item">
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {{ name }}
+                  </li>
+                </ul>
               </div>
-              <div class="progress-stat-lbl">REP.</div>
             </div>
           </div>
         </div>
@@ -970,57 +1082,96 @@ const userInitial = computed(() => {
   text-align: center;
 }
 
-/* SYNC STATUS (pending/failed queue) */
-.sync-status {
-  padding: 10px 16px;
+/* SYNC TOAST (flotante abajo, encima del UndoToast) */
+.sync-toast {
+  position: fixed;
+  /* Va por encima del UndoToast (bottom: 24px). Cuando ambos visibles,
+     sync queda arriba (mas persistente), undo abajo (mas efimero). */
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 12px 16px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 199;
+  max-width: 420px;
+  width: calc(100% - 40px);
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: 12px;
 }
-.sync-status-pending {
-  background: rgba(245, 165, 36, 0.12);
-  border-bottom: 1px solid rgba(245, 165, 36, 0.3);
-  color: #f5a524;
+.sync-toast-pending {
+  border-left: 3px solid var(--mint);
 }
-.sync-status-failed {
-  background: rgba(226, 90, 58, 0.15);
-  border-bottom: 1px solid rgba(226, 90, 58, 0.3);
-  color: #ff8a80;
+.sync-toast-failed {
+  border-left: 3px solid var(--coral);
 }
-.sync-status-text {
+.sync-toast-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.sync-toast-pending .sync-toast-dot {
+  background: var(--mint);
+  animation: sync-toast-pulse 0.7s ease-in-out infinite;
+}
+.sync-toast-failed .sync-toast-dot {
+  background: var(--coral);
+}
+.sync-toast-msg {
   flex: 1;
+  font-size: 13px;
+  font-weight: 500;
   text-align: left;
 }
-.sync-status-actions {
+.sync-toast-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
-.sync-btn {
-  padding: 6px 12px;
-  border: 1px solid currentColor;
-  background: transparent;
-  color: inherit;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  border-radius: 4px;
+.sync-toast-btn {
+  background: none;
+  border: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   cursor: pointer;
-  white-space: nowrap;
+  padding: 4px 8px;
 }
-.sync-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+.sync-toast-btn:hover {
+  opacity: 0.7;
 }
-.sync-btn-retry {
-  background: rgba(226, 90, 58, 0.25);
+.sync-toast-btn-retry {
+  color: var(--coral);
 }
-.sync-btn-discard {
-  opacity: 0.75;
+.sync-toast-btn-discard {
+  color: var(--ink-soft);
+}
+@keyframes sync-toast-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.sync-toast-enter-active {
+  transition: all 0.25s ease-out;
+}
+.sync-toast-leave-active {
+  transition: all 0.18s ease-in;
+}
+.sync-toast-enter-from,
+.sync-toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
 }
 
 /* LOADING */
@@ -1107,12 +1258,95 @@ const userInitial = computed(() => {
 .progress-stat-coral {
   color: var(--coral);
 }
+.progress-stat-mint {
+  color: var(--mint);
+}
 .progress-stat-lbl {
   font-family: var(--mono);
   font-size: clamp(7px, 1vw, 9px);
   letter-spacing: 0.18em;
   color: rgba(246, 241, 225, 0.55);
   margin-top: 2px;
+}
+/* Stat clickeable de Páginas + popover con la lista. */
+.progress-stat-pages {
+  position: relative;
+}
+.progress-stat-btn {
+  display: block;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: right;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.progress-stat-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.pages-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  max-width: min(280px, 90vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--pitch);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  text-align: left;
+}
+.pages-popover-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.pages-popover-count {
+  font-family: var(--mono);
+  color: var(--mint);
+}
+.pages-popover-empty {
+  font-size: 12px;
+  color: var(--chalk-dim);
+  line-height: 1.4;
+  margin: 0;
+}
+.pages-popover-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pages-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--chalk);
+  line-height: 1.2;
+}
+.pages-popover-item svg {
+  color: var(--mint);
+  flex-shrink: 0;
 }
 /* Progress bar */
 .progress-bar {
