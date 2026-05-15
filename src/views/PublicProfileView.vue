@@ -688,7 +688,8 @@ function compareWithOther() {
 <style scoped>
 .public-wrap {
   min-height: 100vh;
-  padding: 24px 18px;
+  padding: calc(24px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
   display: flex;
   align-items: center;
   justify-content: center;

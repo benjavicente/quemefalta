@@ -208,7 +208,8 @@ onMounted(() => {
 
 <style scoped>
 .tm-wrap {
-  padding: 14px clamp(14px, 3vw, 28px) 40px;
+  padding: calc(14px + env(safe-area-inset-top)) clamp(14px, 3vw, 28px)
+    calc(40px + env(safe-area-inset-bottom));
   max-width: 720px;
   margin: 0 auto;
   color: var(--chalk);
