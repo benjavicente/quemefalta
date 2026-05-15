@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ALBUM_SECTIONS, codeForSticker } from '@/lib/albumData';
 import { useStickers } from '@/composables/useStickers';
 import SectionSearch from '@/components/SectionSearch.vue';
@@ -10,9 +10,33 @@ const emit = defineEmits<{
   copied: [message: string];
 }>();
 
-const { stickers, stats } = useStickers();
+const { stickers, stats, adjustDupes } = useStickers();
 
 const searchQuery = ref('');
+
+// "Visible set" sticky por mount: arrancamos con los que tienen dupes>0 al
+// entrar a la vista, y agregamos cualquiera que adquiera dupes>0 durante la
+// sesión. NUNCA removemos: si el usuario baja a 0 con el "−", el item queda
+// grisado para poder volver a sumar sin recargar. Al recargar la vista, el
+// set se reconstruye y los que están en 0 desaparecen.
+const visibleSet = ref<Set<number>>(new Set());
+watch(
+  stickers,
+  (current) => {
+    let mutated = false;
+    const next = visibleSet.value;
+    for (const numStr in current) {
+      const num = Number(numStr);
+      const s = current[num];
+      if (s?.owned && s.dupes > 0 && !next.has(num)) {
+        next.add(num);
+        mutated = true;
+      }
+    }
+    if (mutated) visibleSet.value = new Set(next);
+  },
+  { immediate: true, deep: true },
+);
 
 const dupesList = computed(() => {
   const out: { num: number; section: string; sectionId: string; count: number; note: string }[] =
@@ -21,16 +45,15 @@ const dupesList = computed(() => {
     if (!matchesSection(sec, searchQuery.value)) continue;
     for (let i = 0; i < sec.count; i++) {
       const num = sec.startsAt + i;
+      if (!visibleSet.value.has(num)) continue;
       const s = stickers.value[num];
-      if (s?.owned && s.dupes > 0) {
-        out.push({
-          num,
-          section: sec.name,
-          sectionId: sec.id,
-          count: s.dupes,
-          note: s.note,
-        });
-      }
+      out.push({
+        num,
+        section: sec.name,
+        sectionId: sec.id,
+        count: s?.dupes ?? 0,
+        note: s?.note ?? '',
+      });
     }
   }
   return out.sort((a, b) => a.num - b.num);
@@ -40,6 +63,7 @@ function copyDupes() {
   const lines: string[] = [`Tengo ${stats.value.dupes} láminas repetidas para cambiar:`];
   const bySection = new Map<string, { code: string; count: number }[]>();
   for (const d of dupesList.value) {
+    if (d.count <= 0) continue; // items grisados (bajaron a 0 en sesión): no copiar
     if (!bySection.has(d.section)) bySection.set(d.section, []);
     bySection.get(d.section)!.push({ code: codeForSticker(d.num), count: d.count });
   }
@@ -109,13 +133,18 @@ function copyDupes() {
       </div>
     </div>
     <div v-else class="dupes-list">
-      <button
+      <div
         v-for="d in dupesList"
         :key="d.num"
         class="dupe-item"
-        @click="emit('openDetail', d.num)"
+        :class="{ 'dupe-item-empty': d.count === 0 }"
       >
-        <div class="dupe-main">
+        <button
+          type="button"
+          class="dupe-main-btn"
+          :aria-label="`Editar ${codeForSticker(d.num)}`"
+          @click="emit('openDetail', d.num)"
+        >
           <div class="dupe-num">{{ codeForSticker(d.num) }}</div>
           <div class="dupe-info">
             <div class="dupe-section">{{ d.section }}</div>
@@ -134,9 +163,28 @@ function copyDupes() {
               {{ d.note }}
             </div>
           </div>
+        </button>
+        <div class="dupe-stepper" role="group" :aria-label="`Ajustar repetidas de ${codeForSticker(d.num)}`">
+          <button
+            type="button"
+            class="dupe-step-btn"
+            :disabled="d.count <= 0"
+            aria-label="Quitar una repetida"
+            @click.stop="adjustDupes(d.num, -1)"
+          >
+            −
+          </button>
+          <span class="dupe-count">+{{ d.count }}</span>
+          <button
+            type="button"
+            class="dupe-step-btn"
+            aria-label="Agregar una repetida"
+            @click.stop="adjustDupes(d.num, 1)"
+          >
+            +
+          </button>
         </div>
-        <div class="dupe-count">+{{ d.count }}</div>
-      </button>
+      </div>
     </div>
   </div>
 </template>
@@ -202,28 +250,34 @@ function copyDupes() {
 }
 .dupe-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px;
+  align-items: stretch;
   background: rgba(246, 241, 225, 0.025);
   border: 1px solid var(--line);
   border-left: 3px solid var(--coral);
   border-radius: 6px;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  font-family: inherit;
-  color: inherit;
+  overflow: hidden;
+  transition: opacity 0.25s;
 }
-.dupe-item:hover {
-  background: rgba(246, 241, 225, 0.05);
+.dupe-item-empty {
+  opacity: 0.45;
+  border-left-color: rgba(246, 241, 225, 0.18);
 }
-.dupe-main {
+.dupe-main-btn {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 14px;
   min-width: 0;
-  flex: 1;
+  padding: 14px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.dupe-main-btn:hover {
+  background: rgba(246, 241, 225, 0.05);
 }
 .dupe-num {
   font-family: var(--mono);
@@ -250,6 +304,46 @@ function copyDupes() {
   margin-top: 3px;
   font-style: italic;
 }
+.dupe-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--line);
+  background: rgba(246, 241, 225, 0.02);
+}
+.dupe-step-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--coral);
+  background: transparent;
+  border: 1px solid rgba(226, 90, 58, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.dupe-step-btn:hover {
+  background: rgba(226, 90, 58, 0.12);
+  border-color: var(--coral);
+}
+.dupe-step-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.dupe-step-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  color: rgba(246, 241, 225, 0.4);
+  border-color: rgba(246, 241, 225, 0.15);
+  background: transparent;
+}
 .dupe-count {
   font-family: var(--mono);
   font-size: 11px;
@@ -258,7 +352,15 @@ function copyDupes() {
   padding: 4px 10px;
   background: rgba(226, 90, 58, 0.14);
   border-radius: 100px;
-  flex-shrink: 0;
+  min-width: 42px;
+  text-align: center;
+}
+.dupe-item-empty .dupe-count {
+  color: rgba(246, 241, 225, 0.45);
+  background: rgba(246, 241, 225, 0.05);
+}
+.dupe-item-empty .dupe-num {
+  color: rgba(246, 241, 225, 0.5);
 }
 
 .empty {

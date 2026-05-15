@@ -93,7 +93,9 @@ describe('DupesView', () => {
     const w = mount(DupesView);
     await w.vm.$nextTick();
 
-    await w.find('.dupe-item').trigger('click');
+    // El item ya no es un button único — el área principal abre el modal
+    // y los botones +/− del stepper son hermanos.
+    await w.find('.dupe-main-btn').trigger('click');
     expect(w.emitted('openDetail')).toBeTruthy();
     expect(w.emitted('openDetail')![0]).toEqual([5]);
   });
