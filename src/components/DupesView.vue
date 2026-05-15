@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { ALBUM_SECTIONS, codeForSticker } from '@/lib/albumData';
 import { useStickers } from '@/composables/useStickers';
+import SectionSearch from '@/components/SectionSearch.vue';
+import { matchesSection } from '@/lib/searchSections';
 
 const emit = defineEmits<{
   openDetail: [stickerNumber: number];
@@ -10,10 +12,13 @@ const emit = defineEmits<{
 
 const { stickers, stats } = useStickers();
 
+const searchQuery = ref('');
+
 const dupesList = computed(() => {
   const out: { num: number; section: string; sectionId: string; count: number; note: string }[] =
     [];
   for (const sec of ALBUM_SECTIONS) {
+    if (!matchesSection(sec, searchQuery.value)) continue;
     for (let i = 0; i < sec.count; i++) {
       const num = sec.startsAt + i;
       const s = stickers.value[num];
@@ -75,7 +80,20 @@ function copyDupes() {
         Copiar
       </button>
     </div>
-    <div v-if="dupesList.length === 0" class="empty empty-dupes">
+    <SectionSearch
+      v-if="stats.dupes > 0"
+      v-model="searchQuery"
+      class="dupes-search"
+    />
+
+    <div
+      v-if="stats.dupes > 0 && dupesList.length === 0"
+      class="empty-search"
+    >
+      Sin repetidas en "{{ searchQuery }}".
+    </div>
+
+    <div v-else-if="dupesList.length === 0" class="empty empty-dupes">
       <div class="empty-stack">
         <div class="empty-tile empty-tile-back-l" />
         <div class="empty-tile empty-tile-back-r" />
@@ -167,6 +185,16 @@ function copyDupes() {
   background: var(--gold-deep);
 }
 
+.dupes-search {
+  margin-bottom: 14px;
+}
+.empty-search {
+  text-align: center;
+  padding: 30px 20px;
+  font-size: 12px;
+  color: rgba(246, 241, 225, 0.5);
+  font-style: italic;
+}
 .dupes-list {
   display: flex;
   flex-direction: column;

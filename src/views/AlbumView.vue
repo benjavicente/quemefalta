@@ -22,6 +22,8 @@ import DupesView from '@/components/DupesView.vue';
 import CalculadoraView from '@/components/CalculadoraView.vue';
 import BatchInput from '@/components/BatchInput.vue';
 import BatchRemoveInput from '@/components/BatchRemoveInput.vue';
+import SectionSearch from '@/components/SectionSearch.vue';
+import { matchesSection } from '@/lib/searchSections';
 import StickerScanner from '@/components/StickerScanner.vue';
 import CsvModal from '@/components/CsvModal.vue';
 import WhatsAppModal from '@/components/WhatsAppModal.vue';
@@ -242,17 +244,9 @@ const sectionsWithCounts = computed(() => {
   });
 });
 
-function normalize(str: string): string {
-  return str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-}
-
-const filteredSections = computed(() => {
-  const q = normalize(sectionSearch.value.trim());
-  if (!q) return sectionsWithCounts.value;
-  return sectionsWithCounts.value.filter(
-    (s) => normalize(s.name).includes(q) || normalize(s.code).includes(q),
-  );
-});
+const filteredSections = computed(() =>
+  sectionsWithCounts.value.filter((s) => matchesSection(s, sectionSearch.value)),
+);
 
 // Tab previews
 const almostCompleteSections = computed(() => {
@@ -802,15 +796,11 @@ const userInitial = computed(() => {
       <!-- ALBUM VIEW -->
       <template v-if="view === 'album'">
         <!-- Search -->
-        <div class="sec-search-wrap">
-          <input
+        <div class="sec-search-host">
+          <SectionSearch
             v-model="sectionSearch"
-            class="sec-search"
-            type="text"
-            aria-label="Buscar sección"
-            placeholder="Buscar sección... (ej: México, Argentina)"
-            autocomplete="off"
-            @keydown.enter="selectFirstMatch"
+            placeholder="Buscar sección... (ej: México, MEX)"
+            @enter="selectFirstMatch"
           />
         </div>
         <!-- Search results -->
@@ -1641,26 +1631,8 @@ const userInitial = computed(() => {
 }
 
 /* SECTION SEARCH */
-.sec-search-wrap {
+.sec-search-host {
   padding: 10px clamp(14px, 3vw, 28px) 0;
-}
-.sec-search {
-  width: 100%;
-  padding: 10px 14px;
-  font-family: inherit;
-  font-size: 13px;
-  background: rgba(246, 241, 225, 0.04);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--chalk);
-  outline: none;
-}
-.sec-search::placeholder {
-  color: rgba(246, 241, 225, 0.35);
-}
-.sec-search:focus {
-  border-color: var(--gold);
-  background: rgba(246, 241, 225, 0.06);
 }
 
 /* SECTION PICKER (fallback for search) */

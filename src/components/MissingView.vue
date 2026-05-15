@@ -4,6 +4,8 @@ import { ALBUM_SECTIONS, TOTAL_STICKERS, codeForSticker } from '@/lib/albumData'
 import { pctColor } from '@/lib/progressColors';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import { useStickers } from '@/composables/useStickers';
+import SectionSearch from '@/components/SectionSearch.vue';
+import { matchesSection } from '@/lib/searchSections';
 
 const emit = defineEmits<{
   jumpToSection: [sectionId: string];
@@ -15,6 +17,7 @@ const { stickers, stats } = useStickers();
 const groupFilter = ref<string | null>(null);
 const sortBy = ref<'default' | 'almost'>('default');
 const collapsed = ref<Set<string>>(new Set());
+const searchQuery = ref('');
 
 function toggleCollapse(sectionId: string) {
   const s = new Set(collapsed.value);
@@ -40,6 +43,10 @@ const missingBySection = computed(() => {
         g.section.group === groupFilter.value ||
         (!g.section.group && groupFilter.value === 'intro'),
     );
+  }
+
+  if (searchQuery.value.trim()) {
+    sections = sections.filter((g) => matchesSection(g.section, searchQuery.value));
   }
 
   if (sortBy.value === 'almost') {
@@ -89,6 +96,7 @@ function copyMissing() {
 
     <!-- Filters -->
     <div v-if="stats.missing > 0 && stats.missing < TOTAL_STICKERS" class="missing-filters">
+      <SectionSearch v-model="searchQuery" class="mf-search" />
       <div class="mf-row">
         <select v-model="groupFilter" class="mf-select" aria-label="Filtrar por grupo">
           <option :value="null">Todos los grupos</option>
@@ -100,6 +108,13 @@ function copyMissing() {
           <option value="almost">Casi completas primero</option>
         </select>
       </div>
+    </div>
+
+    <div
+      v-if="stats.missing > 0 && missingBySection.length === 0"
+      class="empty-search"
+    >
+      Sin resultados para "{{ searchQuery }}".
     </div>
 
     <div v-if="stats.missing === 0" class="empty">
@@ -123,7 +138,7 @@ function copyMissing() {
       <div class="empty-title">¡ÁLBUM COMPLETO!</div>
       <div class="empty-sub">Vamos a celebrar.</div>
     </div>
-    <div v-else class="list-grouped">
+    <div v-else-if="missingBySection.length > 0" class="list-grouped">
       <div v-for="group in missingBySection" :key="group.section.id" class="list-group">
         <div
           class="list-group-head"
@@ -213,10 +228,23 @@ function copyMissing() {
 
 .missing-filters {
   margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mf-search {
+  width: 100%;
 }
 .mf-row {
   display: flex;
   gap: 8px;
+}
+.empty-search {
+  text-align: center;
+  padding: 30px 20px;
+  font-size: 12px;
+  color: rgba(246, 241, 225, 0.5);
+  font-style: italic;
 }
 .mf-select {
   flex: 1;
