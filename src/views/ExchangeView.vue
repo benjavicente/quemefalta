@@ -27,10 +27,10 @@ function showCopied(msg: string) {
 }
 
 const nameA = computed(
-  () => profileA.value?.display_name?.split(' ')[0] ?? profileA.value?.username ?? userA.value,
+  () => profileA.value?.display_name?.trim() || profileA.value?.username || userA.value,
 );
 const nameB = computed(
-  () => profileB.value?.display_name?.split(' ')[0] ?? profileB.value?.username ?? userB.value,
+  () => profileB.value?.display_name?.trim() || profileB.value?.username || userB.value,
 );
 
 const metaInfo = computed(() => {

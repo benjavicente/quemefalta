@@ -11,7 +11,7 @@ const error = ref('');
 const saving = ref(false);
 
 const firstName = computed(() => {
-  return profile.value?.display_name?.split(' ')[0] ?? 'colega';
+  return profile.value?.display_name?.trim() || 'colega';
 });
 
 const previewUsername = computed(() => {

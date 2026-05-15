@@ -91,8 +91,8 @@ const stats = computed(() => {
   };
 });
 
-const firstName = computed(() => {
-  return profile.value?.display_name?.split(' ')[0] ?? profile.value?.username;
+const displayName = computed(() => {
+  return profile.value?.display_name?.trim() || profile.value?.username;
 });
 
 const metaInfo = computed(() => {
@@ -175,7 +175,7 @@ async function shareProfile() {
 }
 
 function copyMissing() {
-  const lines = [`A ${firstName.value} le faltan ${stats.value.missing} láminas:`];
+  const lines = [`A ${displayName.value} le faltan ${stats.value.missing} láminas:`];
   for (const g of missingBySection.value) {
     lines.push(`${g.section.name}: ${g.items.map((n) => codeForSticker(n)).join(', ')}`);
   }
@@ -188,7 +188,7 @@ function copyMissing() {
 }
 
 function copyDupes() {
-  const lines = [`${firstName.value} tiene ${stats.value.dupes} repetidas para cambiar:`];
+  const lines = [`${displayName.value} tiene ${stats.value.dupes} repetidas para cambiar:`];
   for (const g of dupesBySection.value) {
     lines.push(`${g.section}: ${g.items.map((i) => `${i.code} (×${i.count})`).join(', ')}`);
   }
@@ -527,7 +527,7 @@ function compareWithOther() {
         <button
           class="share-btn"
           :disabled="sharing"
-          :aria-label="isOwnProfile ? 'Compartir mi perfil' : `Compartir el perfil de ${firstName}`"
+          :aria-label="isOwnProfile ? 'Compartir mi perfil' : `Compartir el perfil de ${displayName}`"
           @click="shareProfile"
         >
           <svg
