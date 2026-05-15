@@ -73,9 +73,7 @@ test.describe('Error Resilience', () => {
   });
 
   test.describe('500 — server error: sticker queues for retry, no revert', () => {
-    test('500 on sticker POST queues op, optimistic stays, sync-toast shows', async ({
-      page,
-    }) => {
+    test('500 on sticker POST queues op, optimistic stays, sync-toast shows', async ({ page }) => {
       // Nueva politica: en error transitorio del servidor, el sticker queda
       // marcado (optimistic) y la op va a la sync queue para retry. El usuario
       // ve el banner `.sync-toast` (pending o failed), no `.sync-error`.

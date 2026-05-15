@@ -257,7 +257,9 @@ function handleRemove() {
         </div>
         <div v-if="breakdown.decrementCount > 0" class="bi-preview-block">
           <div class="bi-preview-row">
-            <span class="bi-preview-num bi-preview-num-decrement">−{{ breakdown.decrementCount }}</span>
+            <span class="bi-preview-num bi-preview-num-decrement"
+              >−{{ breakdown.decrementCount }}</span
+            >
             <span class="bi-preview-label">
               {{ breakdown.decrementCount === 1 ? 'repetida' : 'repetidas' }} menos
               <span class="bi-preview-meta">(sigue marcada como tuya)</span>
@@ -282,7 +284,11 @@ function handleRemove() {
       </div>
 
       <div class="bi-footer">
-        <button class="bi-btn bi-btn-remove" :disabled="breakdown.total === 0" @click="handleRemove">
+        <button
+          class="bi-btn bi-btn-remove"
+          :disabled="breakdown.total === 0"
+          @click="handleRemove"
+        >
           Quitar
           <span v-if="breakdown.total > 0" class="bi-btn-count">{{ breakdown.total }}</span>
         </button>

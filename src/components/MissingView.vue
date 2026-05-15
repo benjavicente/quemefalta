@@ -110,10 +110,7 @@ function copyMissing() {
       </div>
     </div>
 
-    <div
-      v-if="stats.missing > 0 && missingBySection.length === 0"
-      class="empty-search"
-    >
+    <div v-if="stats.missing > 0 && missingBySection.length === 0" class="empty-search">
       Sin resultados para "{{ searchQuery }}".
     </div>
 

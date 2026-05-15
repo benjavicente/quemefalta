@@ -34,8 +34,11 @@ mock-data.json
 # Local-only assets
 demo.mp4
 
-# Claude Code
-.claude/
+# Claude Code (personal: settings.local.json, launch.json, etc.)
+.claude/*
+# Pero el settings.json a nivel proyecto sí se comparte con el equipo:
+# define el hook PreToolUse que corre `npm run lint` antes de cada `git commit`.
+!.claude/settings.json
 
 # Coverage reports
 coverage/

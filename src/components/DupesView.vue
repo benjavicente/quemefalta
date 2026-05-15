@@ -104,16 +104,9 @@ function copyDupes() {
         Copiar
       </button>
     </div>
-    <SectionSearch
-      v-if="stats.dupes > 0"
-      v-model="searchQuery"
-      class="dupes-search"
-    />
+    <SectionSearch v-if="stats.dupes > 0" v-model="searchQuery" class="dupes-search" />
 
-    <div
-      v-if="stats.dupes > 0 && dupesList.length === 0"
-      class="empty-search"
-    >
+    <div v-if="stats.dupes > 0 && dupesList.length === 0" class="empty-search">
       Sin repetidas en "{{ searchQuery }}".
     </div>
 
@@ -164,7 +157,11 @@ function copyDupes() {
             </div>
           </div>
         </button>
-        <div class="dupe-stepper" role="group" :aria-label="`Ajustar repetidas de ${codeForSticker(d.num)}`">
+        <div
+          class="dupe-stepper"
+          role="group"
+          :aria-label="`Ajustar repetidas de ${codeForSticker(d.num)}`"
+        >
           <button
             type="button"
             class="dupe-step-btn"

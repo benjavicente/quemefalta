@@ -79,8 +79,8 @@ async function remove() {
     <div class="modal" @click.stop>
       <div class="modal-title">MI WHATSAPP</div>
       <p class="modal-desc">
-        Otros usuarios autenticados podrán ver este número en tu perfil y en la vista de
-        intercambio para escribirte. Anónimos no lo ven.
+        Otros usuarios autenticados podrán ver este número en tu perfil y en la vista de intercambio
+        para escribirte. Anónimos no lo ven.
       </p>
 
       <label class="wa-label" for="wa-input">Número con código de país</label>

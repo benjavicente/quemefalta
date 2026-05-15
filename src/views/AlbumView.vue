@@ -474,9 +474,7 @@ const userInitial = computed(() => {
                   <span>Perfil {{ profile?.is_public ? 'público' : 'privado' }}</span>
                   <span class="pm-item-sub">
                     {{
-                      profile?.is_public
-                        ? 'Cualquiera con el link puede verlo'
-                        : 'Solo vos lo ves'
+                      profile?.is_public ? 'Cualquiera con el link puede verlo' : 'Solo vos lo ves'
                     }}
                   </span>
                   <span v-if="visibilityError" class="pm-item-error" role="alert">

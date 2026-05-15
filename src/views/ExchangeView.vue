@@ -253,12 +253,7 @@ onMounted(async () => {
             </svg>
             WhatsApp
           </a>
-          <button
-            v-else-if="isMeA"
-            type="button"
-            class="wa-add-btn"
-            @click="openWhatsAppModal"
-          >
+          <button v-else-if="isMeA" type="button" class="wa-add-btn" @click="openWhatsAppModal">
             + Agregar tu WhatsApp
           </button>
         </div>
@@ -310,12 +305,7 @@ onMounted(async () => {
             </svg>
             WhatsApp
           </a>
-          <button
-            v-else-if="isMeB"
-            type="button"
-            class="wa-add-btn"
-            @click="openWhatsAppModal"
-          >
+          <button v-else-if="isMeB" type="button" class="wa-add-btn" @click="openWhatsAppModal">
             + Agregar tu WhatsApp
           </button>
         </div>

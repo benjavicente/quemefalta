@@ -149,11 +149,17 @@ test.describe('Preview Mode (unauthenticated)', () => {
     await expect(prompt.locator('.login-prompt-title')).toContainText('Crea tu cuenta');
   });
 
-  test('scan button and "+ Agregar" button are visible in tabs', async ({ page }) => {
+  test('scan, "+ Agregar" and "− Quitar" buttons are visible in tabs', async ({ page }) => {
     await page.goto('/album');
 
     await expect(page.locator('.tab-scan')).toBeVisible();
-    await expect(page.locator('.tab-add')).toBeVisible();
-    await expect(page.locator('.tab-add')).toContainText('Agregar');
+    // "+ Agregar" → .tab-add sin la modifier .tab-remove
+    const addBtn = page.locator('.tab-add:not(.tab-remove)');
+    await expect(addBtn).toBeVisible();
+    await expect(addBtn).toContainText('Agregar');
+    // "− Quitar" → .tab-remove
+    const removeBtn = page.locator('.tab-remove');
+    await expect(removeBtn).toBeVisible();
+    await expect(removeBtn).toContainText('Quitar');
   });
 });

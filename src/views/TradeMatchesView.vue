@@ -13,9 +13,7 @@ const { matches, loading, loaded, error, load } = useTradeMatches();
 
 useMeta(computed(() => ({ title: 'Con quién cambiar cerca tuyo — QueMeFalta' })));
 
-const usefulMatches = computed(() =>
-  matches.value.filter((m) => m.their_dupes_for_me > 0),
-);
+const usefulMatches = computed(() => matches.value.filter((m) => m.their_dupes_for_me > 0));
 const charityMatches = computed(() =>
   matches.value.filter((m) => m.their_dupes_for_me === 0 && m.my_dupes_for_them > 0),
 );
@@ -59,14 +57,7 @@ onMounted(() => {
 <template>
   <div class="tm-wrap">
     <header class="tm-header">
-      <button
-        type="button"
-        class="tm-back"
-        aria-label="Volver"
-        @click="router.back()"
-      >
-        ‹
-      </button>
+      <button type="button" class="tm-back" aria-label="Volver" @click="router.back()">‹</button>
       <div class="tm-title-wrap">
         <h1 class="tm-title">Con quién cambiar cerca tuyo</h1>
         <p class="tm-sub">Usuarios con láminas que te sirven, o a los que les sirven las tuyas.</p>
@@ -114,8 +105,8 @@ onMounted(() => {
     <div v-else-if="loaded && matches.length === 0" class="tm-empty">
       <p>Todavía no hay matches.</p>
       <p class="tm-empty-sub">
-        Cuando otros usuarios marquen sus repetidas vas a verlos acá ordenados por cuánto te
-        sirven sus láminas.
+        Cuando otros usuarios marquen sus repetidas vas a verlos acá ordenados por cuánto te sirven
+        sus láminas.
       </p>
     </div>
 
@@ -164,11 +155,7 @@ onMounted(() => {
       <section v-if="charityMatches.length > 0" class="tm-section">
         <h2 class="tm-section-title">Solo das tú</h2>
         <ul class="tm-list">
-          <li
-            v-for="m in charityMatches"
-            :key="m.user_id"
-            class="tm-card tm-card-charity"
-          >
+          <li v-for="m in charityMatches" :key="m.user_id" class="tm-card tm-card-charity">
             <button
               type="button"
               class="tm-card-main"
