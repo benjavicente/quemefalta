@@ -77,9 +77,9 @@ describe('useTradeMatches', () => {
   });
 
   it('does not start a second load while one is in flight', async () => {
-    let resolveCall: ((v: unknown) => void) | null = null;
+    let resolveCall: ((v: { data: any; error: any }) => void) | null = null;
     supabase.rpc.mockReturnValue(
-      new Promise((resolve) => {
+      new Promise<{ data: any; error: any }>((resolve) => {
         resolveCall = resolve;
       }),
     );
