@@ -23,6 +23,7 @@ import CalculadoraView from '@/components/CalculadoraView.vue';
 import BatchInput from '@/components/BatchInput.vue';
 import StickerScanner from '@/components/StickerScanner.vue';
 import CsvModal from '@/components/CsvModal.vue';
+import WhatsAppModal from '@/components/WhatsAppModal.vue';
 import UndoToast from '@/components/UndoToast.vue';
 import OnboardingGuide from '@/components/OnboardingGuide.vue';
 
@@ -113,6 +114,7 @@ const shareOpen = ref(false);
 const showBatchInput = ref(false);
 const showScanner = ref(false);
 const showCsvModal = ref(false);
+const showWhatsAppModal = ref(false);
 const showProfileMenu = ref(false);
 const showLoginPrompt = ref(false);
 const showPagesPopover = ref(false);
@@ -471,6 +473,20 @@ const userInitial = computed(() => {
                   aria-hidden="true"
                 >
                   <span class="pm-toggle-dot" />
+                </span>
+              </button>
+              <button
+                class="pm-item"
+                @click="
+                  showWhatsAppModal = true;
+                  showProfileMenu = false;
+                "
+              >
+                <span class="pm-item-label">
+                  <span>Mi WhatsApp</span>
+                  <span class="pm-item-sub">
+                    {{ profile?.phone ? profile.phone : 'Sin configurar' }}
+                  </span>
                 </span>
               </button>
               <button
@@ -842,6 +858,7 @@ const userInitial = computed(() => {
     <!-- STICKER SCANNER MODAL -->
     <StickerScanner v-if="showScanner" @add="handleScannerAdd" @close="showScanner = false" />
     <CsvModal v-if="showCsvModal" @close="showCsvModal = false" @imported="showCsvModal = false" />
+    <WhatsAppModal v-if="showWhatsAppModal" @close="showWhatsAppModal = false" />
 
     <!-- LONG-PRESS TIP -->
     <Transition name="tip">

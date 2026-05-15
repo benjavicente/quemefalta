@@ -2,15 +2,49 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useExchange } from '@/composables/useExchange';
+import { useAuth } from '@/composables/useAuth';
 import { useMeta } from '@/composables/useMeta';
 import { formatExchangeList } from '@/lib/exchangeUtils';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
+import { supabase, withAuthRetry } from '@/lib/supabase';
 import { track } from '@/lib/analytics';
 
 const route = useRoute();
+const { user } = useAuth();
 
 const userA = computed(() => route.params.userA as string);
 const userB = computed(() => route.params.userB as string);
+
+const whatsappA = ref<string | null>(null);
+const whatsappB = ref<string | null>(null);
+
+function buildHref(num: string | null): string | null {
+  if (!num) return null;
+  const digits = num.replace(/[^\d]/g, '');
+  if (digits.length < 8) return null;
+  return `https://wa.me/${digits}`;
+}
+
+const whatsappHrefA = computed(() => buildHref(whatsappA.value));
+const whatsappHrefB = computed(() => buildHref(whatsappB.value));
+
+async function loadWhatsAppNumbers() {
+  if (!user.value) {
+    whatsappA.value = null;
+    whatsappB.value = null;
+    return;
+  }
+  const [{ data: dataA }, { data: dataB }] = await Promise.all([
+    withAuthRetry(() => supabase.rpc('get_profile_phone', { p_username: userA.value })),
+    withAuthRetry(() => supabase.rpc('get_profile_phone', { p_username: userB.value })),
+  ]);
+  whatsappA.value = typeof dataA === 'string' && dataA.trim() ? dataA : null;
+  whatsappB.value = typeof dataB === 'string' && dataB.trim() ? dataB : null;
+}
+
+function handleWhatsAppClick(target: string) {
+  track('contact_whatsapp', { from: 'exchange', target });
+}
 
 const { loading, error, profileA, profileB, statsA, statsB, exchange, load } = useExchange(
   userA,
@@ -108,9 +142,10 @@ function shareComparison() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   track('view_exchange');
-  load();
+  await load();
+  await loadWhatsAppNumbers();
 });
 </script>
 
@@ -171,18 +206,36 @@ onMounted(() => {
 
       <!-- Two profile mini-cards -->
       <div class="profiles">
-        <a :href="`/u/${profileA.username}`" class="profile-mini">
-          <div v-if="profileA.avatar_url" class="mini-avatar">
-            <img :src="profileA.avatar_url" :alt="nameA" />
-          </div>
-          <div v-else class="mini-avatar mini-avatar-ph">{{ initialOf(profileA) }}</div>
-          <div class="mini-name">{{ nameA }}</div>
-          <div class="mini-handle">@{{ profileA.username }}</div>
-          <div v-if="statsA" class="mini-stats">
-            <span>{{ statsA.pct }}%</span>
-            <span class="mini-dupes">{{ statsA.dupes }} rep.</span>
-          </div>
-        </a>
+        <div class="profile-col">
+          <a :href="`/u/${profileA.username}`" class="profile-mini">
+            <div v-if="profileA.avatar_url" class="mini-avatar">
+              <img :src="profileA.avatar_url" :alt="nameA" />
+            </div>
+            <div v-else class="mini-avatar mini-avatar-ph">{{ initialOf(profileA) }}</div>
+            <div class="mini-name">{{ nameA }}</div>
+            <div class="mini-handle">@{{ profileA.username }}</div>
+            <div v-if="statsA" class="mini-stats">
+              <span>{{ statsA.pct }}%</span>
+              <span class="mini-dupes">{{ statsA.dupes }} rep.</span>
+            </div>
+          </a>
+          <a
+            v-if="whatsappHrefA"
+            :href="whatsappHrefA"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="wa-pill"
+            :aria-label="`Escribir a ${nameA} por WhatsApp`"
+            @click="handleWhatsAppClick(profileA.username)"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.981.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.885-9.885 9.885M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.892c0 2.096.549 4.142 1.595 5.945L0 24l6.335-1.652a11.93 11.93 0 0 0 5.71 1.447h.006c6.585 0 11.946-5.336 11.949-11.896 0-3.176-1.24-6.165-3.495-8.411"
+              />
+            </svg>
+            WhatsApp
+          </a>
+        </div>
 
         <div class="swap-icon" aria-hidden="true">
           <svg
@@ -202,18 +255,36 @@ onMounted(() => {
           </svg>
         </div>
 
-        <a :href="`/u/${profileB.username}`" class="profile-mini">
-          <div v-if="profileB.avatar_url" class="mini-avatar">
-            <img :src="profileB.avatar_url" :alt="nameB" />
-          </div>
-          <div v-else class="mini-avatar mini-avatar-ph">{{ initialOf(profileB) }}</div>
-          <div class="mini-name">{{ nameB }}</div>
-          <div class="mini-handle">@{{ profileB.username }}</div>
-          <div v-if="statsB" class="mini-stats">
-            <span>{{ statsB.pct }}%</span>
-            <span class="mini-dupes">{{ statsB.dupes }} rep.</span>
-          </div>
-        </a>
+        <div class="profile-col">
+          <a :href="`/u/${profileB.username}`" class="profile-mini">
+            <div v-if="profileB.avatar_url" class="mini-avatar">
+              <img :src="profileB.avatar_url" :alt="nameB" />
+            </div>
+            <div v-else class="mini-avatar mini-avatar-ph">{{ initialOf(profileB) }}</div>
+            <div class="mini-name">{{ nameB }}</div>
+            <div class="mini-handle">@{{ profileB.username }}</div>
+            <div v-if="statsB" class="mini-stats">
+              <span>{{ statsB.pct }}%</span>
+              <span class="mini-dupes">{{ statsB.dupes }} rep.</span>
+            </div>
+          </a>
+          <a
+            v-if="whatsappHrefB"
+            :href="whatsappHrefB"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="wa-pill"
+            :aria-label="`Escribir a ${nameB} por WhatsApp`"
+            @click="handleWhatsAppClick(profileB.username)"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.981.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.885-9.885 9.885M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.892c0 2.096.549 4.142 1.595 5.945L0 24l6.335-1.652a11.93 11.93 0 0 0 5.71 1.447h.006c6.585 0 11.946-5.336 11.949-11.896 0-3.176-1.24-6.165-3.495-8.411"
+              />
+            </svg>
+            WhatsApp
+          </a>
+        </div>
       </div>
 
       <!-- Exchange lists -->
@@ -441,10 +512,17 @@ onMounted(() => {
 /* Two profile mini-cards */
 .profiles {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   gap: 12px;
   margin-bottom: 22px;
+}
+.profile-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .profile-mini {
   flex: 1;
@@ -456,6 +534,25 @@ onMounted(() => {
   border: 1px solid var(--paper-deep);
   border-radius: 10px;
   transition: box-shadow 0.15s;
+}
+.wa-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  background: #25d366;
+  color: white;
+  border-radius: 8px;
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: background 0.15s;
+}
+.wa-pill:hover {
+  background: #1da851;
 }
 .profile-mini:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
