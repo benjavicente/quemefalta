@@ -8,12 +8,29 @@ import { formatExchangeList } from '@/lib/exchangeUtils';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import { supabase, withAuthRetry } from '@/lib/supabase';
 import { track } from '@/lib/analytics';
+import WhatsAppModal from '@/components/WhatsAppModal.vue';
 
 const route = useRoute();
-const { user } = useAuth();
+const { user, profile: myProfile } = useAuth();
 
 const userA = computed(() => route.params.userA as string);
 const userB = computed(() => route.params.userB as string);
+
+const showWhatsAppModal = ref(false);
+
+// "Soy yo" sobre cada slot — sirve para decidir cuándo mostrar el CTA inline
+// de "Agregar WhatsApp" en vez de la pill verde de contacto.
+const isMeA = computed(() => !!myProfile.value && myProfile.value.username === userA.value);
+const isMeB = computed(() => !!myProfile.value && myProfile.value.username === userB.value);
+
+function openWhatsAppModal() {
+  showWhatsAppModal.value = true;
+}
+
+async function onWhatsAppSaved() {
+  showWhatsAppModal.value = false;
+  await loadWhatsAppNumbers();
+}
 
 const whatsappA = ref<string | null>(null);
 const whatsappB = ref<string | null>(null);
@@ -235,6 +252,14 @@ onMounted(async () => {
             </svg>
             WhatsApp
           </a>
+          <button
+            v-else-if="isMeA"
+            type="button"
+            class="wa-add-btn"
+            @click="openWhatsAppModal"
+          >
+            + Agregar tu WhatsApp
+          </button>
         </div>
 
         <div class="swap-icon" aria-hidden="true">
@@ -284,13 +309,21 @@ onMounted(async () => {
             </svg>
             WhatsApp
           </a>
+          <button
+            v-else-if="isMeB"
+            type="button"
+            class="wa-add-btn"
+            @click="openWhatsAppModal"
+          >
+            + Agregar tu WhatsApp
+          </button>
         </div>
       </div>
 
       <!-- Exchange lists -->
       <div v-if="exchange.aGivesBCount > 0 || exchange.bGivesACount > 0" class="lists">
         <!-- A gives B -->
-        <details v-if="exchange.aGivesBCount > 0" class="list-detail" open>
+        <details v-if="exchange.aGivesBCount > 0" class="list-detail">
           <summary class="list-summary">
             <span>{{ nameA }} le da a {{ nameB }} ({{ exchange.aGivesBCount }})</span>
             <button class="list-copy" @click.prevent="copyAGivesB">Copiar</button>
@@ -312,7 +345,7 @@ onMounted(async () => {
         </details>
 
         <!-- B gives A -->
-        <details v-if="exchange.bGivesACount > 0" class="list-detail" open>
+        <details v-if="exchange.bGivesACount > 0" class="list-detail">
           <summary class="list-summary">
             <span>{{ nameB }} le da a {{ nameA }} ({{ exchange.bGivesACount }})</span>
             <button class="list-copy" @click.prevent="copyBGivesA">Copiar</button>
@@ -412,6 +445,12 @@ onMounted(async () => {
         </a>
       </div>
     </div>
+
+    <WhatsAppModal
+      v-if="showWhatsAppModal"
+      @close="showWhatsAppModal = false"
+      @saved="onWhatsAppSaved"
+    />
   </div>
 </template>
 
@@ -554,6 +593,28 @@ onMounted(async () => {
 }
 .wa-pill:hover {
   background: #1da851;
+}
+.wa-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px dashed var(--paper-deep);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.wa-add-btn:hover {
+  border-color: #25d366;
+  color: #25d366;
 }
 .profile-mini:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
