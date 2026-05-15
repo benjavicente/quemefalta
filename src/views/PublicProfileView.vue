@@ -553,6 +553,9 @@ function compareWithOther() {
         <button v-if="isOwnProfile" class="cta-btn" @click="router.push('/album')">
           Volver a mi álbum
         </button>
+        <button v-if="isOwnProfile" class="compare-btn" @click="router.push('/cambios')">
+          Con quién cambiar
+        </button>
         <!-- Compare (own profile) -->
         <div v-if="isOwnProfile" class="compare-row">
           <button v-if="!showCompareInput" class="compare-link" @click="showCompareInput = true">

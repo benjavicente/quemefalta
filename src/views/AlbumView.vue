@@ -26,7 +26,7 @@ import CsvModal from '@/components/CsvModal.vue';
 import UndoToast from '@/components/UndoToast.vue';
 import OnboardingGuide from '@/components/OnboardingGuide.vue';
 
-const { user, profile, signOut } = useAuth();
+const { user, profile, signOut, updateProfile } = useAuth();
 const isPreview = computed(() => !user.value);
 provide('isPreview', isPreview);
 const {
@@ -117,6 +117,24 @@ const showProfileMenu = ref(false);
 const showLoginPrompt = ref(false);
 const showPagesPopover = ref(false);
 const sectionSearch = ref('');
+const togglingVisibility = ref(false);
+const visibilityError = ref<string | null>(null);
+
+async function toggleVisibility() {
+  if (togglingVisibility.value || !profile.value) return;
+  togglingVisibility.value = true;
+  visibilityError.value = null;
+  const newValue = !profile.value.is_public;
+  try {
+    await updateProfile({ is_public: newValue });
+    track('toggle_profile_visibility', { is_public: newValue });
+  } catch (e) {
+    console.error('[toggleVisibility]', e);
+    visibilityError.value = 'No se pudo guardar. Intenta de nuevo.';
+  } finally {
+    togglingVisibility.value = false;
+  }
+}
 
 // Undo toast state
 const undoToast = ref({ visible: false, message: '', action: null as (() => void) | null });
@@ -425,6 +443,36 @@ const userInitial = computed(() => {
                 <span>Mi perfil</span>
                 <span class="pm-user">@{{ profile.username }}</span>
               </router-link>
+              <router-link class="pm-item" to="/cambios">
+                <span>Con quién cambiar</span>
+              </router-link>
+              <button
+                class="pm-item pm-item-toggle"
+                :disabled="togglingVisibility"
+                :aria-pressed="!!profile?.is_public"
+                @click.stop="toggleVisibility"
+              >
+                <span class="pm-item-label">
+                  <span>Perfil {{ profile?.is_public ? 'público' : 'privado' }}</span>
+                  <span class="pm-item-sub">
+                    {{
+                      profile?.is_public
+                        ? 'Cualquiera con el link puede verlo'
+                        : 'Solo vos lo ves'
+                    }}
+                  </span>
+                  <span v-if="visibilityError" class="pm-item-error" role="alert">
+                    {{ visibilityError }}
+                  </span>
+                </span>
+                <span
+                  class="pm-toggle"
+                  :class="{ 'pm-toggle-on': profile?.is_public }"
+                  aria-hidden="true"
+                >
+                  <span class="pm-toggle-dot" />
+                </span>
+              </button>
               <button
                 class="pm-item"
                 @click="
@@ -998,6 +1046,61 @@ const userInitial = computed(() => {
   font-family: var(--mono);
   font-size: 10px;
   color: rgba(246, 241, 225, 0.5);
+}
+.pm-item-toggle {
+  align-items: center;
+  gap: 12px;
+}
+.pm-item-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.pm-item-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.pm-item-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: rgba(246, 241, 225, 0.5);
+  letter-spacing: 0.02em;
+}
+.pm-item-error {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--coral);
+  margin-top: 2px;
+}
+.pm-toggle {
+  flex-shrink: 0;
+  width: 32px;
+  height: 18px;
+  background: rgba(246, 241, 225, 0.12);
+  border-radius: 999px;
+  position: relative;
+  transition: background 0.15s;
+}
+.pm-toggle-dot {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--chalk-dim, rgba(246, 241, 225, 0.7));
+  border-radius: 50%;
+  transition:
+    transform 0.15s,
+    background 0.15s;
+}
+.pm-toggle-on {
+  background: rgba(77, 208, 161, 0.35);
+}
+.pm-toggle-on .pm-toggle-dot {
+  transform: translateX(14px);
+  background: var(--mint);
 }
 .pm-danger {
   color: var(--coral);

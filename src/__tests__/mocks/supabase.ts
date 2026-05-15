@@ -56,6 +56,7 @@ function createQueryBuilder(table?: string) {
 
 export const supabase = {
   from: vi.fn((table?: string) => createQueryBuilder(table)),
+  rpc: vi.fn(async (_fn?: string, _params?: unknown) => ({ data: null, error: null })),
   auth: {
     getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
     getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
@@ -99,6 +100,10 @@ export function resetSupabaseMock() {
   // Reset from() to return fresh builders
   supabase.from.mockClear();
   supabase.from.mockImplementation((table?: string) => createQueryBuilder(table));
+
+  // Reset rpc to no-op default
+  supabase.rpc.mockClear();
+  supabase.rpc.mockImplementation(async () => ({ data: null, error: null }));
 
   // Reset auth methods and restore default return values
   supabase.auth.getSession.mockClear().mockResolvedValue({ data: { session: null }, error: null });

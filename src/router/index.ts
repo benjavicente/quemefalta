@@ -43,6 +43,12 @@ const router = createRouter({
       component: () => import('@/views/ExchangeView.vue'),
       meta: { isPublic: true },
     },
+    {
+      path: '/cambios',
+      name: 'trade-matches',
+      component: () => import('@/views/TradeMatchesView.vue'),
+      meta: { requiresOnboarded: true },
+    },
   ],
 });
 
