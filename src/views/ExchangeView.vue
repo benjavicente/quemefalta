@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useExchange } from '@/composables/useExchange';
 import { useAuth } from '@/composables/useAuth';
 import { useMeta } from '@/composables/useMeta';
@@ -11,6 +11,7 @@ import { track } from '@/lib/analytics';
 import WhatsAppModal from '@/components/WhatsAppModal.vue';
 
 const route = useRoute();
+const router = useRouter();
 const { user, profile: myProfile } = useAuth();
 
 const userA = computed(() => route.params.userA as string);
@@ -426,6 +427,11 @@ onMounted(async () => {
         <p class="empty-sub">Ninguno tiene repetidas que al otro le falten.</p>
       </div>
 
+      <!-- Volver a mi álbum (solo si está logueado) -->
+      <button v-if="user" class="back-to-album" @click="router.push('/album')">
+        Volver a mi álbum
+      </button>
+
       <!-- Footer -->
       <div class="footer">
         <a href="/" class="brand">
@@ -802,6 +808,25 @@ details[open] > .list-summary::before {
   font-size: 12px;
   color: var(--ink-soft);
   margin: 6px 0 0;
+}
+
+.back-to-album {
+  width: 100%;
+  padding: 14px 0;
+  margin-top: 20px;
+  background: var(--pitch);
+  color: var(--paper);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.back-to-album:hover {
+  background: var(--pitch-deep);
 }
 
 /* Footer */
