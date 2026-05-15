@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { ALBUM_SECTIONS, stickerNumberFromCode } from '@/lib/albumData';
+import { ALBUM_SECTIONS, stickerNumberFromCode, codeForSticker } from '@/lib/albumData';
 import { useStickers } from '@/composables/useStickers';
 
 const emit = defineEmits<{
@@ -109,20 +109,36 @@ function parseInput(raw: string): number[] {
 const breakdown = computed(() => {
   const nums = parseInput(input.value);
   if (nums.length === 0) {
-    return { unmarkedCount: 0, decrementCount: 0, skippedCount: 0, total: 0 };
+    return {
+      unmarkedCount: 0,
+      decrementCount: 0,
+      skippedCount: 0,
+      total: 0,
+      unmarkedCodes: [] as string[],
+      decrementCodes: [] as string[],
+      skippedCodes: [] as string[],
+    };
   }
 
   const counts = new Map<number, number>();
   for (const n of nums) counts.set(n, (counts.get(n) || 0) + 1);
 
+  const ordered = [...counts.entries()].sort(([a], [b]) => a - b);
+
   let unmarkedCount = 0;
   let decrementCount = 0;
   let skippedCount = 0;
+  const unmarkedCodes: string[] = [];
+  const decrementCodes: string[] = [];
+  const skippedCodes: string[] = [];
 
-  for (const [num, count] of counts) {
+  for (const [num, count] of ordered) {
     const existing = stickers.value[num];
+    const code = codeForSticker(num);
+
     if (!existing?.owned) {
       skippedCount += count;
+      skippedCodes.push(count > 1 ? `${code} (×${count})` : code);
       continue;
     }
     const totalCopies = 1 + existing.dupes;
@@ -131,11 +147,21 @@ const breakdown = computed(() => {
 
     if (remaining === 0) {
       unmarkedCount++;
-      decrementCount += removed - 1; // las extras que también se quitan en la misma lámina
+      unmarkedCodes.push(code);
+      // Las copias extra que también se quitan en la misma lámina
+      const extraRemoved = removed - 1;
+      if (extraRemoved > 0) {
+        decrementCount += extraRemoved;
+        decrementCodes.push(extraRemoved > 1 ? `${code} (−${extraRemoved})` : code);
+      }
     } else {
       decrementCount += removed;
+      decrementCodes.push(removed > 1 ? `${code} (−${removed})` : code);
     }
-    skippedCount += count - removed;
+    if (count > removed) {
+      skippedCount += count - removed;
+      skippedCodes.push(count - removed > 1 ? `${code} (×${count - removed})` : code);
+    }
   }
 
   return {
@@ -143,6 +169,9 @@ const breakdown = computed(() => {
     decrementCount,
     skippedCount,
     total: unmarkedCount + decrementCount,
+    unmarkedCodes,
+    decrementCodes,
+    skippedCodes,
   };
 });
 
@@ -214,26 +243,41 @@ function handleRemove() {
       <div v-if="error" class="bi-error" role="alert">{{ error }}</div>
 
       <div v-if="breakdown.total > 0 || breakdown.skippedCount > 0" class="bi-preview-card">
-        <div v-if="breakdown.unmarkedCount > 0" class="bi-preview-row">
-          <span class="bi-preview-num bi-preview-num-unmark">−{{ breakdown.unmarkedCount }}</span>
-          <span class="bi-preview-label">
-            {{ breakdown.unmarkedCount === 1 ? 'desmarcada' : 'desmarcadas' }}
-            <span class="bi-preview-meta">(1 → 0, vuelve a faltante)</span>
-          </span>
+        <div v-if="breakdown.unmarkedCount > 0" class="bi-preview-block">
+          <div class="bi-preview-row">
+            <span class="bi-preview-num bi-preview-num-unmark">−{{ breakdown.unmarkedCount }}</span>
+            <span class="bi-preview-label">
+              {{ breakdown.unmarkedCount === 1 ? 'desmarcada' : 'desmarcadas' }}
+              <span class="bi-preview-meta">(1 → 0, vuelve a faltante)</span>
+            </span>
+          </div>
+          <div class="bi-preview-codes bi-preview-codes-unmark">
+            {{ breakdown.unmarkedCodes.join(', ') }}
+          </div>
         </div>
-        <div v-if="breakdown.decrementCount > 0" class="bi-preview-row">
-          <span class="bi-preview-num bi-preview-num-decrement">−{{ breakdown.decrementCount }}</span>
-          <span class="bi-preview-label">
-            {{ breakdown.decrementCount === 1 ? 'repetida' : 'repetidas' }} menos
-            <span class="bi-preview-meta">(sigue marcada como tuya)</span>
-          </span>
+        <div v-if="breakdown.decrementCount > 0" class="bi-preview-block">
+          <div class="bi-preview-row">
+            <span class="bi-preview-num bi-preview-num-decrement">−{{ breakdown.decrementCount }}</span>
+            <span class="bi-preview-label">
+              {{ breakdown.decrementCount === 1 ? 'repetida' : 'repetidas' }} menos
+              <span class="bi-preview-meta">(sigue marcada como tuya)</span>
+            </span>
+          </div>
+          <div class="bi-preview-codes bi-preview-codes-decrement">
+            {{ breakdown.decrementCodes.join(', ') }}
+          </div>
         </div>
-        <div v-if="breakdown.skippedCount > 0" class="bi-preview-row bi-preview-row-skip">
-          <span class="bi-preview-num bi-preview-num-skip">{{ breakdown.skippedCount }}</span>
-          <span class="bi-preview-label">
-            {{ breakdown.skippedCount === 1 ? 'ignorada' : 'ignoradas' }}
-            <span class="bi-preview-meta">(no las tenías)</span>
-          </span>
+        <div v-if="breakdown.skippedCount > 0" class="bi-preview-block bi-preview-block-skip">
+          <div class="bi-preview-row bi-preview-row-skip">
+            <span class="bi-preview-num bi-preview-num-skip">{{ breakdown.skippedCount }}</span>
+            <span class="bi-preview-label">
+              {{ breakdown.skippedCount === 1 ? 'ignorada' : 'ignoradas' }}
+              <span class="bi-preview-meta">(no las tenías)</span>
+            </span>
+          </div>
+          <div class="bi-preview-codes bi-preview-codes-skip">
+            {{ breakdown.skippedCodes.join(', ') }}
+          </div>
         </div>
       </div>
 
@@ -369,7 +413,33 @@ function handleRemove() {
   background: rgba(246, 241, 225, 0.02);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.bi-preview-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bi-preview-block-skip {
+  opacity: 0.7;
+}
+.bi-preview-codes {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.5;
+  padding-left: 48px;
+  word-break: break-word;
+}
+.bi-preview-codes-unmark {
+  color: var(--coral);
+}
+.bi-preview-codes-decrement {
+  color: var(--gold);
+}
+.bi-preview-codes-skip {
+  color: rgba(246, 241, 225, 0.45);
 }
 .bi-preview-row {
   display: flex;

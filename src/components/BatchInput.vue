@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { ALBUM_SECTIONS, stickerNumberFromCode } from '@/lib/albumData';
+import { ALBUM_SECTIONS, stickerNumberFromCode, codeForSticker } from '@/lib/albumData';
 import { useStickers } from '@/composables/useStickers';
 
 const emit = defineEmits<{
@@ -128,27 +128,48 @@ function parseInput(raw: string): number[] {
  */
 const breakdown = computed(() => {
   const nums = parseInput(input.value);
-  if (nums.length === 0) return { newCount: 0, extraCount: 0, total: 0 };
+  if (nums.length === 0) {
+    return {
+      newCount: 0,
+      extraCount: 0,
+      total: 0,
+      newCodes: [] as string[],
+      extraCodes: [] as string[],
+    };
+  }
 
   // Contar apariciones por sticker en el input
   const counts = new Map<number, number>();
   for (const n of nums) counts.set(n, (counts.get(n) || 0) + 1);
 
+  // Ordenamos por sticker_number para mostrar los códigos en orden del álbum
+  const ordered = [...counts.entries()].sort(([a], [b]) => a - b);
+
   let newCount = 0;
   let extraCount = 0;
-  for (const [num, count] of counts) {
+  const newCodes: string[] = [];
+  const extraCodes: string[] = [];
+
+  for (const [num, count] of ordered) {
     const existing = stickers.value[num];
+    const code = codeForSticker(num);
     if (!existing?.owned) {
       // Pasa de 0 a 1+ : 1 cuenta como "nueva", el resto como extras.
       newCount++;
-      extraCount += count - 1;
+      newCodes.push(code);
+      const extras = count - 1;
+      if (extras > 0) {
+        extraCount += extras;
+        extraCodes.push(extras > 1 ? `${code} (+${extras})` : code);
+      }
     } else {
       // Ya la tenías → todas las apariciones suman como extras.
       extraCount += count;
+      extraCodes.push(count > 1 ? `${code} (+${count})` : code);
     }
   }
 
-  return { newCount, extraCount, total: newCount + extraCount };
+  return { newCount, extraCount, total: newCount + extraCount, newCodes, extraCodes };
 });
 
 function addTeamCode(code: string) {
@@ -220,19 +241,29 @@ function handleAdd() {
       <div v-if="error" class="bi-error" role="alert">{{ error }}</div>
 
       <div v-if="breakdown.total > 0" class="bi-preview-card">
-        <div v-if="breakdown.newCount > 0" class="bi-preview-row">
-          <span class="bi-preview-num bi-preview-num-new">+{{ breakdown.newCount }}</span>
-          <span class="bi-preview-label">
-            {{ breakdown.newCount === 1 ? 'nueva' : 'nuevas' }}
-            <span class="bi-preview-meta">(0 → 1)</span>
-          </span>
+        <div v-if="breakdown.newCount > 0" class="bi-preview-block">
+          <div class="bi-preview-row">
+            <span class="bi-preview-num bi-preview-num-new">+{{ breakdown.newCount }}</span>
+            <span class="bi-preview-label">
+              {{ breakdown.newCount === 1 ? 'nueva' : 'nuevas' }}
+              <span class="bi-preview-meta">(0 → 1)</span>
+            </span>
+          </div>
+          <div class="bi-preview-codes bi-preview-codes-new">
+            {{ breakdown.newCodes.join(', ') }}
+          </div>
         </div>
-        <div v-if="breakdown.extraCount > 0" class="bi-preview-row">
-          <span class="bi-preview-num bi-preview-num-extra">+{{ breakdown.extraCount }}</span>
-          <span class="bi-preview-label">
-            {{ breakdown.extraCount === 1 ? 'repetida' : 'repetidas' }} más
-            <span class="bi-preview-meta">(suma a las que ya tienes)</span>
-          </span>
+        <div v-if="breakdown.extraCount > 0" class="bi-preview-block">
+          <div class="bi-preview-row">
+            <span class="bi-preview-num bi-preview-num-extra">+{{ breakdown.extraCount }}</span>
+            <span class="bi-preview-label">
+              {{ breakdown.extraCount === 1 ? 'repetida' : 'repetidas' }} más
+              <span class="bi-preview-meta">(suma a las que ya tienes)</span>
+            </span>
+          </div>
+          <div class="bi-preview-codes bi-preview-codes-extra">
+            {{ breakdown.extraCodes.join(', ') }}
+          </div>
         </div>
       </div>
 
@@ -368,7 +399,27 @@ function handleAdd() {
   background: rgba(246, 241, 225, 0.02);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.bi-preview-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bi-preview-codes {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.5;
+  padding-left: 48px;
+  word-break: break-word;
+}
+.bi-preview-codes-new {
+  color: var(--mint);
+}
+.bi-preview-codes-extra {
+  color: var(--gold);
 }
 .bi-preview-row {
   display: flex;
