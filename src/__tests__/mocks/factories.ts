@@ -55,6 +55,7 @@ export function createProfile(overrides?: Partial<Profile>): Profile {
     avatar_url: 'https://example.com/avatar.jpg',
     is_public: true,
     onboarded: true,
+    phone: null,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
     ...overrides,
