@@ -5,6 +5,7 @@ import { useExchange } from '@/composables/useExchange';
 import { useMeta } from '@/composables/useMeta';
 import { formatExchangeList } from '@/lib/exchangeUtils';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
+import { track } from '@/lib/analytics';
 
 const route = useRoute();
 
@@ -107,7 +108,10 @@ function shareComparison() {
   }
 }
 
-onMounted(load);
+onMounted(() => {
+  track('view_exchange');
+  load();
+});
 </script>
 
 <template>

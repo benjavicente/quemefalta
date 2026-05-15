@@ -5,12 +5,16 @@ import { Analytics } from '@vercel/analytics/vue';
 
 const { init } = useAuth();
 
+// En mock mode (npm run dev:mock) no montamos Analytics: el dev local no debe
+// inyectar el script de Vercel ni emitir page views al dashboard de prod.
+const analyticsEnabled = import.meta.env.VITE_MOCK !== 'true';
+
 onMounted(() => {
   init();
 });
 </script>
 
 <template>
-  <Analytics />
   <RouterView />
+  <Analytics v-if="analyticsEnabled" />
 </template>

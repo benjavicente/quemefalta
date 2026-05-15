@@ -9,6 +9,7 @@ import type { StickerState } from '@/composables/useStickers';
 import type { AlbumSection } from '@/lib/albumData';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import { FWC_CODE, getFwcVariant } from '@/lib/fwcConfig';
+import { track } from '@/lib/analytics';
 
 const isPreview = inject<Ref<boolean>>('isPreview', ref(false));
 
@@ -73,6 +74,10 @@ const isComplete = computed(() => ownedCount.value === props.section.count);
 const hasAny = computed(() => ownedCount.value > 0);
 
 function completeSection() {
+  track('complete_section', {
+    section: props.section.id,
+    remaining: props.section.count - ownedCount.value,
+  });
   markSectionComplete(props.section.startsAt, props.section.count);
 }
 
