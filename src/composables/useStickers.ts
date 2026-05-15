@@ -635,21 +635,20 @@ async function addBatch(stickerNumbers: number[]) {
     for (const [num, count] of counts) {
       const existing = stickers.value[num];
       if (!existing?.owned) {
-        // Not owned yet → mark owned, extra copies become dupes
+        // No la tenía: 1 instancia llena el slot "owned", el resto son dupes.
         toUpsert.push({
           num,
           prev: existing,
           newState: { owned: true, dupes: count - 1, note: existing?.note ?? '' },
         });
-      } else if (count > 1) {
-        // Already owned, but input has duplicates → add those as extra dupes
+      } else {
+        // Ya la tenía: cada instancia del input suma como repetida nueva.
         toUpsert.push({
           num,
           prev: existing,
-          newState: { ...existing, dupes: existing.dupes + (count - 1) },
+          newState: { ...existing, dupes: existing.dupes + count },
         });
       }
-      // If already owned and count === 1, nothing to do
     }
 
     if (toUpsert.length === 0) return 0;

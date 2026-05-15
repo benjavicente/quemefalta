@@ -541,7 +541,7 @@ describe('useStickers', () => {
       expect(stickers.value[1]?.dupes).toBe(2);
     });
 
-    it('adds extra dupes to already owned stickers', async () => {
+    it('adds extra dupes to already owned stickers (each occurrence counts)', async () => {
       setQueryResult({
         data: [createStickerDbRow(5, { owned: true, dupes: 1, note: null })],
         error: null,
@@ -551,24 +551,25 @@ describe('useStickers', () => {
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
       setQueryResult({ data: null, error: null });
-      await addBatch([5, 5]); // 2 copies of already-owned → +1 dupe
+      await addBatch([5, 5]); // ya owned → 2 instancias = +2 dupes
 
-      expect(stickers.value[5]?.dupes).toBe(2); // was 1, +1
+      expect(stickers.value[5]?.dupes).toBe(3); // was 1, +2
     });
 
-    it('skips already owned stickers with single count', async () => {
+    it('adds one dupe when already owned and input has single count', async () => {
       setQueryResult({
         data: [createStickerDbRow(5, { owned: true, dupes: 0, note: null })],
         error: null,
       });
 
-      const { addBatch, loaded } = useStickers();
+      const { stickers, addBatch, loaded } = useStickers();
       await vi.waitFor(() => expect(loaded.value).toBe(true));
 
       setQueryResult({ data: null, error: null });
-      const count = await addBatch([5]); // already owned, count=1 → no-op
+      const count = await addBatch([5]); // ya owned + 1 instancia → +1 dupe
 
-      expect(count).toBe(0);
+      expect(count).toBe(1);
+      expect(stickers.value[5]?.dupes).toBe(1);
     });
 
     it('filters out invalid sticker numbers', async () => {

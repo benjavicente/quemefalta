@@ -139,7 +139,7 @@ test.describe('Preview Mode (unauthenticated)', () => {
 
     // Enter some codes and submit
     await page.locator('.bi-input').fill('FWC1, FWC5');
-    await expect(page.locator('.bi-preview')).toContainText('2 láminas');
+    await expect(page.locator('.bi-preview-card')).toContainText('+2');
     await page.click('.bi-btn');
 
     // Batch modal closes and login prompt appears

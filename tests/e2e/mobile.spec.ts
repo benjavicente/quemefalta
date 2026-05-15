@@ -97,7 +97,7 @@ test.describe('Mobile (375px)', () => {
     expect(modalBox!.width).toBeLessThanOrEqual(375);
 
     await page.locator('.bi-input').fill('FWC1, FWC2');
-    await expect(page.locator('.bi-preview')).toContainText('2 láminas');
+    await expect(page.locator('.bi-preview-card')).toContainText('+2');
     await page.click('.bi-btn');
     await expect(page.locator('.bi')).not.toBeVisible();
   });

@@ -19,7 +19,7 @@ test.describe('Batch Input Flow', () => {
     await expect(page.locator('.bi')).toBeVisible();
 
     await page.locator('.bi-input').fill('FWC1, FWC5, FWC10');
-    await expect(page.locator('.bi-preview')).toContainText('3 láminas');
+    await expect(page.locator('.bi-preview-card')).toContainText('+3');
 
     await page.click('.bi-btn');
     await expect(page.locator('.bi')).not.toBeVisible();
@@ -34,7 +34,7 @@ test.describe('Batch Input Flow', () => {
 
     await page.click('.tab-add');
     await page.locator('.bi-input').fill('FWC');
-    await expect(page.locator('.bi-preview')).toContainText('20 láminas');
+    await expect(page.locator('.bi-preview-card')).toContainText('+20');
 
     await page.click('.bi-btn');
     await expect(page.locator('.bi')).not.toBeVisible();
@@ -47,16 +47,18 @@ test.describe('Batch Input Flow', () => {
 
     await page.click('.tab-add');
     await page.locator('.bi-input').fill('MEX 1 5 8');
-    await expect(page.locator('.bi-preview')).toContainText('3 láminas');
+    await expect(page.locator('.bi-preview-card')).toContainText('+3');
   });
 
-  test('duplicate codes show repetidas count', async ({ page }) => {
+  test('duplicate codes show extras', async ({ page }) => {
     await page.goto('/album');
 
     await page.click('.tab-add');
     await page.locator('.bi-input').fill('FWC1, FWC1, FWC5');
-    await expect(page.locator('.bi-preview')).toContainText('2 láminas');
-    await expect(page.locator('.bi-preview')).toContainText('1 rep.');
+    // 2 nuevas (FWC1, FWC5) + 1 repetida extra (FWC1 duplicado)
+    await expect(page.locator('.bi-preview-card')).toContainText('+2');
+    await expect(page.locator('.bi-preview-card')).toContainText('+1');
+    await expect(page.locator('.bi-preview-card')).toContainText('repetida');
   });
 });
 

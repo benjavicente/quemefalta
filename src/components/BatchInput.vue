@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { ALBUM_SECTIONS, stickerNumberFromCode } from '@/lib/albumData';
+import { useStickers } from '@/composables/useStickers';
 
 const emit = defineEmits<{
   add: [numbers: number[]];
   close: [];
 }>();
+
+const { stickers } = useStickers();
 
 const input = ref('');
 const error = ref('');
@@ -118,14 +121,35 @@ function parseInput(raw: string): number[] {
   return nums.sort((a, b) => a - b);
 }
 
-/** Summary of parsed result for preview display */
-function parseSummary(raw: string) {
-  const nums = parseInput(raw);
-  const total = nums.length;
-  const unique = new Set(nums).size;
-  const dupes = total - unique;
-  return { total, unique, dupes };
-}
+/**
+ * Desglose vs el estado actual: cuántas láminas pasan de 0→1 (nuevas) y cuántas
+ * dupes nuevas se suman a las que ya tenías (extras). Sirve para el preview
+ * en el modal antes de tocar "Agregar".
+ */
+const breakdown = computed(() => {
+  const nums = parseInput(input.value);
+  if (nums.length === 0) return { newCount: 0, extraCount: 0, total: 0 };
+
+  // Contar apariciones por sticker en el input
+  const counts = new Map<number, number>();
+  for (const n of nums) counts.set(n, (counts.get(n) || 0) + 1);
+
+  let newCount = 0;
+  let extraCount = 0;
+  for (const [num, count] of counts) {
+    const existing = stickers.value[num];
+    if (!existing?.owned) {
+      // Pasa de 0 a 1+ : 1 cuenta como "nueva", el resto como extras.
+      newCount++;
+      extraCount += count - 1;
+    } else {
+      // Ya la tenías → todas las apariciones suman como extras.
+      extraCount += count;
+    }
+  }
+
+  return { newCount, extraCount, total: newCount + extraCount };
+});
 
 function addTeamCode(code: string) {
   const current = input.value.trim();
@@ -194,14 +218,28 @@ function handleAdd() {
         @keydown.enter.meta="handleAdd"
       />
       <div v-if="error" class="bi-error" role="alert">{{ error }}</div>
-      <div class="bi-footer">
-        <div class="bi-preview">
-          {{ parseSummary(input).unique }} láminas<template v-if="parseSummary(input).dupes > 0">
-            + {{ parseSummary(input).dupes }} rep.</template
-          >
+
+      <div v-if="breakdown.total > 0" class="bi-preview-card">
+        <div v-if="breakdown.newCount > 0" class="bi-preview-row">
+          <span class="bi-preview-num bi-preview-num-new">+{{ breakdown.newCount }}</span>
+          <span class="bi-preview-label">
+            {{ breakdown.newCount === 1 ? 'nueva' : 'nuevas' }}
+            <span class="bi-preview-meta">(0 → 1)</span>
+          </span>
         </div>
-        <button class="bi-btn" :disabled="parseSummary(input).total === 0" @click="handleAdd">
-          Agregar al álbum
+        <div v-if="breakdown.extraCount > 0" class="bi-preview-row">
+          <span class="bi-preview-num bi-preview-num-extra">+{{ breakdown.extraCount }}</span>
+          <span class="bi-preview-label">
+            {{ breakdown.extraCount === 1 ? 'repetida' : 'repetidas' }} más
+            <span class="bi-preview-meta">(suma a las que ya tienes)</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="bi-footer">
+        <button class="bi-btn" :disabled="breakdown.total === 0" @click="handleAdd">
+          Agregar
+          <span v-if="breakdown.total > 0" class="bi-btn-count">{{ breakdown.total }}</span>
         </button>
       </div>
     </div>
@@ -322,20 +360,56 @@ function handleAdd() {
   color: var(--coral);
   margin-top: 6px;
 }
+.bi-preview-card {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(246, 241, 225, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bi-preview-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--chalk);
+}
+.bi-preview-num {
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1;
+  min-width: 38px;
+}
+.bi-preview-num-new {
+  color: var(--mint);
+}
+.bi-preview-num-extra {
+  color: var(--gold);
+}
+.bi-preview-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+}
+.bi-preview-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: rgba(246, 241, 225, 0.4);
+  letter-spacing: 0.02em;
+}
 .bi-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-top: 14px;
   gap: 12px;
 }
-.bi-preview {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: rgba(246, 241, 225, 0.5);
-}
 .bi-btn {
-  padding: 12px 24px;
+  padding: 12px 22px;
   background: var(--gold);
   color: var(--pitch-deep);
   border: none;
@@ -346,6 +420,16 @@ function handleAdd() {
   font-family: inherit;
   transition: all 0.15s;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.bi-btn-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: rgba(7, 32, 25, 0.2);
+  padding: 2px 7px;
+  border-radius: 100px;
 }
 .bi-btn:disabled {
   opacity: 0.4;

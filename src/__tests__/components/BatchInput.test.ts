@@ -27,9 +27,9 @@ describe('BatchInput', () => {
       expect(w.find('.bi-input').exists()).toBe(true);
     });
 
-    it('shows 0 láminas preview when empty', () => {
+    it('hides preview card when empty', () => {
       const w = mountBatch();
-      expect(w.find('.bi-preview').text()).toContain('0 láminas');
+      expect(w.find('.bi-preview-card').exists()).toBe(false);
     });
 
     it('disables add button when input is empty', () => {
@@ -42,38 +42,42 @@ describe('BatchInput', () => {
     it('parses single sticker code', async () => {
       const w = mountBatch();
       await w.find('.bi-input').setValue('MEX5');
-      expect(w.find('.bi-preview').text()).toContain('1 láminas');
+      expect(w.find('.bi-preview-card').text()).toContain('+1');
+      expect(w.find('.bi-preview-card').text()).toContain('nueva');
     });
 
     it('parses multiple codes comma-separated', async () => {
       const w = mountBatch();
       await w.find('.bi-input').setValue('MEX5, ARG1, BRA3');
-      expect(w.find('.bi-preview').text()).toContain('3 láminas');
+      expect(w.find('.bi-preview-card').text()).toContain('+3');
+      expect(w.find('.bi-preview-card').text()).toContain('nuevas');
     });
 
     it('parses team code to expand all stickers', async () => {
       const w = mountBatch();
       await w.find('.bi-input').setValue('MEX');
-      expect(w.find('.bi-preview').text()).toContain('20 láminas');
+      expect(w.find('.bi-preview-card').text()).toContain('+20');
     });
 
     it('parses prefix + numbers format', async () => {
       const w = mountBatch();
       await w.find('.bi-input').setValue('MEX 1 5 8');
-      expect(w.find('.bi-preview').text()).toContain('3 láminas');
+      expect(w.find('.bi-preview-card').text()).toContain('+3');
     });
 
     it('parses code range', async () => {
       const w = mountBatch();
       await w.find('.bi-input').setValue('MEX1-MEX5');
-      expect(w.find('.bi-preview').text()).toContain('5 láminas');
+      expect(w.find('.bi-preview-card').text()).toContain('+5');
     });
 
-    it('shows dupes when codes are repeated', async () => {
+    it('shows extras when codes are repeated', async () => {
       const w = mountBatch();
       await w.find('.bi-input').setValue('MEX5, MEX5');
-      expect(w.find('.bi-preview').text()).toContain('1 láminas');
-      expect(w.find('.bi-preview').text()).toContain('1 rep.');
+      // 1 nueva + 1 repetida extra
+      expect(w.find('.bi-preview-card').text()).toContain('+1');
+      expect(w.find('.bi-preview-card').text()).toContain('nueva');
+      expect(w.find('.bi-preview-card').text()).toContain('repetida');
     });
 
     it('enables add button when valid input present', async () => {
