@@ -37,7 +37,7 @@ const steps: Step[] = [
   },
   {
     selector: '[data-stk]:first-child .stk',
-    text: 'Toca una lámina para marcarla. Tócala de nuevo y se vuelve repetida (×2, ×3…).',
+    text: 'Toca una lámina para marcarla. Tócala de nuevo y suma repetida (+1, +2…).',
     position: 'bottom',
     setup: () => {
       // Open first team if none open

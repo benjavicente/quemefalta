@@ -172,7 +172,7 @@ function onPointerCancel() {
       </div>
       <!-- Badges -->
       <div v-if="dupes > 0" class="stk-badge" :class="{ 'stk-badge-bounce': badgeBounce }">
-        ×{{ dupes + 1 }}
+        +{{ dupes }}
       </div>
       <div v-if="hasNote" class="stk-note-dot" />
       <!-- Sync status: orange dot = pendiente de guardar, red = fallo definitivo -->

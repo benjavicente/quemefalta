@@ -66,8 +66,8 @@ describe('DupesView', () => {
     const w = mount(DupesView);
     await w.vm.$nextTick();
 
-    // dupes=2 means ×3 total (1 base + 2 extra)
-    expect(w.find('.dupe-count').text()).toBe('×3');
+    // dupes=2 → muestra "+2" (solo los extras, sin contar la base)
+    expect(w.find('.dupe-count').text()).toBe('+2');
   });
 
   it('shows note with pencil icon when present', async () => {

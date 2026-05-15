@@ -32,9 +32,9 @@ describe('StickerDetailModal', () => {
       expect(w.find('.step-row').exists()).toBe(false);
     });
 
-    it('shows correct total count (dupes + 1)', () => {
+    it('shows dupes count (no longer includes the base sticker)', () => {
       const w = mountModal({ owned: true, dupes: 2 });
-      expect(w.find('.step-num').text()).toBe('3');
+      expect(w.find('.step-num').text()).toBe('2');
     });
 
     it('disables decrement button when dupes is 0', () => {
@@ -52,7 +52,7 @@ describe('StickerDetailModal', () => {
       const incrementBtn = btns[1];
 
       await incrementBtn.trigger('click');
-      expect(w.find('.step-num').text()).toBe('2');
+      expect(w.find('.step-num').text()).toBe('1');
     });
 
     it('clicking - decrements displayed count', async () => {
@@ -61,7 +61,7 @@ describe('StickerDetailModal', () => {
       const decrementBtn = btns[0];
 
       await decrementBtn.trigger('click');
-      expect(w.find('.step-num').text()).toBe('2'); // was 3, now 2
+      expect(w.find('.step-num').text()).toBe('1');
     });
   });
 

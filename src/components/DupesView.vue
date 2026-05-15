@@ -36,10 +36,14 @@ function copyDupes() {
   const bySection = new Map<string, { code: string; count: number }[]>();
   for (const d of dupesList.value) {
     if (!bySection.has(d.section)) bySection.set(d.section, []);
-    bySection.get(d.section)!.push({ code: codeForSticker(d.num), count: d.count + 1 });
+    bySection.get(d.section)!.push({ code: codeForSticker(d.num), count: d.count });
   }
   for (const [section, items] of bySection) {
-    lines.push(`\n${section}: ${items.map((i) => `${i.code} (×${i.count})`).join(', ')}`);
+    lines.push(
+      `\n${section}: ${items
+        .map((i) => (i.count > 1 ? `${i.code} (+${i.count})` : i.code))
+        .join(', ')}`,
+    );
   }
   const text = lines.join('\n');
   navigator.clipboard?.writeText(text).then(
@@ -113,7 +117,7 @@ function copyDupes() {
             </div>
           </div>
         </div>
-        <div class="dupe-count">×{{ d.count + 1 }}</div>
+        <div class="dupe-count">+{{ d.count }}</div>
       </button>
     </div>
   </div>

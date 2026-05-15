@@ -99,8 +99,8 @@ const suggestions = ['Para Pedro', 'Cambio por delantero', 'Promesa', 'Cambio so
             −
           </button>
           <div class="step-center">
-            <span class="step-num">{{ dupes + 1 }}</span>
-            <span class="step-total">TOTAL</span>
+            <span class="step-num">{{ dupes }}</span>
+            <span class="step-total">REPETIDAS</span>
           </div>
           <button class="step-btn" @click="dupes++">+</button>
         </div>

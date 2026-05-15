@@ -131,10 +131,10 @@ describe('formatExchangeList', () => {
     ];
     const text = formatExchangeList('Pedro', 'María', groups, 2);
     expect(text).toContain('Pedro le puede dar 2 láminas a María:');
-    expect(text).toContain('Introducción & FIFA Museum: FWC0, FWC2 (×3)');
+    expect(text).toContain('Introducción & FIFA Museum: FWC0, FWC2 (+3)');
   });
 
-  it('only shows ×N when dupeCount > 1', () => {
+  it('only shows +N when dupeCount > 1', () => {
     const groups = [
       {
         section: {

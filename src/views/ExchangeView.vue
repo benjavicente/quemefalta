@@ -303,7 +303,7 @@ onMounted(async () => {
               <div class="list-group-codes">
                 {{
                   g.items
-                    .map((i) => (i.dupeCount > 1 ? `${i.code} (×${i.dupeCount})` : i.code))
+                    .map((i) => (i.dupeCount > 1 ? `${i.code} (+${i.dupeCount})` : i.code))
                     .join(', ')
                 }}
               </div>
@@ -325,7 +325,7 @@ onMounted(async () => {
               <div class="list-group-codes">
                 {{
                   g.items
-                    .map((i) => (i.dupeCount > 1 ? `${i.code} (×${i.dupeCount})` : i.code))
+                    .map((i) => (i.dupeCount > 1 ? `${i.code} (+${i.dupeCount})` : i.code))
                     .join(', ')
                 }}
               </div>

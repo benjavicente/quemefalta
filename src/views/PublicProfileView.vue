@@ -149,7 +149,7 @@ const dupesBySection = computed(() => {
       const s = stickerMap.value.get(num);
       if (s?.owned && s.dupes > 0) {
         if (!groups.has(sec.id)) groups.set(sec.id, { section: sec.name, items: [] });
-        groups.get(sec.id)!.items.push({ code: codeForSticker(num), count: s.dupes + 1 });
+        groups.get(sec.id)!.items.push({ code: codeForSticker(num), count: s.dupes });
       }
     }
   }
@@ -202,7 +202,11 @@ function copyMissing() {
 function copyDupes() {
   const lines = [`${displayName.value} tiene ${stats.value.dupes} repetidas para cambiar:`];
   for (const g of dupesBySection.value) {
-    lines.push(`${g.section}: ${g.items.map((i) => `${i.code} (×${i.count})`).join(', ')}`);
+    lines.push(
+      `${g.section}: ${g.items
+        .map((i) => (i.count > 1 ? `${i.code} (+${i.count})` : i.code))
+        .join(', ')}`,
+    );
   }
   navigator.clipboard?.writeText(lines.join('\n')).then(() => {
     copied.value = 'Repetidas copiadas';
@@ -537,7 +541,11 @@ function compareWithOther() {
             <div v-for="g in dupesBySection" :key="g.section" class="list-group">
               <div class="list-group-name">{{ g.section }}</div>
               <div class="list-group-codes">
-                {{ g.items.map((i) => `${i.code} (×${i.count})`).join(', ') }}
+                {{
+                  g.items
+                    .map((i) => (i.count > 1 ? `${i.code} (+${i.count})` : i.code))
+                    .join(', ')
+                }}
               </div>
             </div>
           </div>

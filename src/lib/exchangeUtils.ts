@@ -78,7 +78,7 @@ export function formatExchangeList(
 ): string {
   const lines = [`${giverName} le puede dar ${totalCount} láminas a ${receiverName}:`];
   for (const g of groups) {
-    const codes = g.items.map((i) => (i.dupeCount > 1 ? `${i.code} (×${i.dupeCount})` : i.code));
+    const codes = g.items.map((i) => (i.dupeCount > 1 ? `${i.code} (+${i.dupeCount})` : i.code));
     lines.push(`${g.section.name}: ${codes.join(', ')}`);
   }
   return lines.join('\n');

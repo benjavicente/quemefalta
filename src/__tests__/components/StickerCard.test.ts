@@ -38,11 +38,11 @@ describe('StickerCard', () => {
       expect(w.find('.stk-dupe').exists()).toBe(true);
     });
 
-    it('shows badge with dupes+1 count', () => {
+    it('shows badge with dupes count (+N)', () => {
       const w = mountCard({ owned: true, dupes: 2 });
       const badge = w.find('.stk-badge');
       expect(badge.exists()).toBe(true);
-      expect(badge.text()).toBe('×3');
+      expect(badge.text()).toBe('+2');
     });
 
     it('does not show badge when dupes is 0', () => {
