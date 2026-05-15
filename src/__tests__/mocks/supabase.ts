@@ -56,9 +56,10 @@ function createQueryBuilder(table?: string) {
 
 export const supabase = {
   from: vi.fn((table?: string) => createQueryBuilder(table)),
-  rpc: vi.fn<(fn?: string, params?: unknown) => Promise<{ data: any; error: any }>>(
-    async () => ({ data: null, error: null }),
-  ),
+  rpc: vi.fn<(fn?: string, params?: unknown) => Promise<{ data: any; error: any }>>(async () => ({
+    data: null,
+    error: null,
+  })),
   auth: {
     getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
     getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),

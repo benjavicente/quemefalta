@@ -71,7 +71,10 @@ describe('WhatsAppModal', () => {
     it('rejects too-short numbers', async () => {
       const w = mountModal();
       await w.find('.wa-input').setValue('1234');
-      await w.findAll('.wa-btn').find((b) => b.text() === 'Guardar')!.trigger('click');
+      await w
+        .findAll('.wa-btn')
+        .find((b) => b.text() === 'Guardar')!
+        .trigger('click');
       expect(w.find('.wa-error').exists()).toBe(true);
       expect(updateProfileMock).not.toHaveBeenCalled();
     });
@@ -79,7 +82,10 @@ describe('WhatsAppModal', () => {
     it('rejects too-long numbers (>15 digits)', async () => {
       const w = mountModal();
       await w.find('.wa-input').setValue('1234567890123456');
-      await w.findAll('.wa-btn').find((b) => b.text() === 'Guardar')!.trigger('click');
+      await w
+        .findAll('.wa-btn')
+        .find((b) => b.text() === 'Guardar')!
+        .trigger('click');
       expect(w.find('.wa-error').exists()).toBe(true);
       expect(updateProfileMock).not.toHaveBeenCalled();
     });
@@ -87,7 +93,10 @@ describe('WhatsAppModal', () => {
     it('accepts a valid number with spaces and +', async () => {
       const w = mountModal();
       await w.find('.wa-input').setValue('+56 9 1234 5678');
-      await w.findAll('.wa-btn').find((b) => b.text() === 'Guardar')!.trigger('click');
+      await w
+        .findAll('.wa-btn')
+        .find((b) => b.text() === 'Guardar')!
+        .trigger('click');
       await flushPromises();
       expect(updateProfileMock).toHaveBeenCalledWith({ phone: '+56912345678' });
     });
@@ -97,7 +106,10 @@ describe('WhatsAppModal', () => {
     it('calls updateProfile with normalized phone and emits saved/close', async () => {
       const w = mountModal();
       await w.find('.wa-input').setValue('+56 9 1234 5678');
-      await w.findAll('.wa-btn').find((b) => b.text() === 'Guardar')!.trigger('click');
+      await w
+        .findAll('.wa-btn')
+        .find((b) => b.text() === 'Guardar')!
+        .trigger('click');
       await flushPromises();
       expect(updateProfileMock).toHaveBeenCalledWith({ phone: '+56912345678' });
       expect(trackMock).toHaveBeenCalledWith('save_phone', { cleared: false });
@@ -110,7 +122,10 @@ describe('WhatsAppModal', () => {
       const w = mountModal();
       await flushPromises();
       await w.find('.wa-input').setValue('');
-      await w.findAll('.wa-btn').find((b) => b.text() === 'Guardar')!.trigger('click');
+      await w
+        .findAll('.wa-btn')
+        .find((b) => b.text() === 'Guardar')!
+        .trigger('click');
       await flushPromises();
       expect(updateProfileMock).toHaveBeenCalledWith({ phone: null });
       expect(trackMock).toHaveBeenCalledWith('save_phone', { cleared: true });
@@ -121,7 +136,10 @@ describe('WhatsAppModal', () => {
       const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const w = mountModal();
       await w.find('.wa-input').setValue('+56912345678');
-      await w.findAll('.wa-btn').find((b) => b.text() === 'Guardar')!.trigger('click');
+      await w
+        .findAll('.wa-btn')
+        .find((b) => b.text() === 'Guardar')!
+        .trigger('click');
       await flushPromises();
       expect(w.find('.wa-error').exists()).toBe(true);
       expect(w.emitted('close')).toBeUndefined();
