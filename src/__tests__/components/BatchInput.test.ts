@@ -119,10 +119,10 @@ describe('BatchInput', () => {
       expect(w.emitted('add')).toBeUndefined();
     });
 
-    it('emits close when background clicked', async () => {
+    it('does NOT emit close when background is clicked (prevents accidental dismissal)', async () => {
       const w = mountBatch();
       await w.find('.bi-bg').trigger('click');
-      expect(w.emitted('close')).toHaveLength(1);
+      expect(w.emitted('close')).toBeUndefined();
     });
 
     it('emits close when X clicked', async () => {

@@ -164,7 +164,7 @@ function handleRemove() {
 </script>
 
 <template>
-  <div class="bi-bg" @click="emit('close')" @keydown.escape="emit('close')">
+  <div class="bi-bg">
     <div class="bi" @click.stop>
       <div class="bi-head">
         <div>
