@@ -366,6 +366,9 @@ defineExpose({ openSection });
   gap: 8px;
   padding: 11px 14px;
   background: transparent;
+  /* Compensa el header sticky cuando scrollIntoView() apunta al team abierto
+     después de un hard reload con hash de equipo (#team-mex, etc). */
+  scroll-margin-top: calc(72px + env(safe-area-inset-top, 0px));
   border: none;
   color: var(--chalk);
   font-family: inherit;

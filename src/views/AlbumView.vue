@@ -1365,6 +1365,9 @@ const userInitial = computed(() => {
 .progress {
   padding: clamp(14px, 3vw, 24px) clamp(14px, 3vw, 28px) clamp(12px, 2vw, 20px);
   border-bottom: 1px solid var(--line);
+  /* Compensa el header sticky cuando scrollIntoView() apunta acá tras un
+     hard reload con #missing/#dupes/#calc. Sin esto, el header tapa los stats. */
+  scroll-margin-top: calc(72px + env(safe-area-inset-top, 0px));
 }
 .progress-row {
   display: flex;
