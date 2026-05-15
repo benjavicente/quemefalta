@@ -13,7 +13,14 @@ export default defineConfig({
     restoreMocks: true,
     coverage: {
       provider: 'v8',
-      exclude: ['src/assets/**'],
+      exclude: [
+        'src/assets/**',
+        // Dev-only helpers que no se cargan en producción
+        'src/lib/mockClient.ts',
+        // Setup y mocks de testing
+        'src/__tests__/setup.ts',
+        'src/__tests__/mocks/**',
+      ],
       thresholds: {
         statements: 65,
         functions: 60,
