@@ -21,6 +21,7 @@ import MissingView from '@/components/MissingView.vue';
 import DupesView from '@/components/DupesView.vue';
 import CalculadoraView from '@/components/CalculadoraView.vue';
 import BatchInput from '@/components/BatchInput.vue';
+import BatchRemoveInput from '@/components/BatchRemoveInput.vue';
 import StickerScanner from '@/components/StickerScanner.vue';
 import CsvModal from '@/components/CsvModal.vue';
 import WhatsAppModal from '@/components/WhatsAppModal.vue';
@@ -46,6 +47,7 @@ const {
   adjustDupes,
   removeSticker,
   addBatch,
+  removeBatch,
   cycleSticker,
 } = useStickers();
 
@@ -112,6 +114,7 @@ const progressRef = ref<HTMLElement | null>(null);
 const detailFor = ref<number | null>(null);
 const shareOpen = ref(false);
 const showBatchInput = ref(false);
+const showBatchRemove = ref(false);
 const showScanner = ref(false);
 const showCsvModal = ref(false);
 const showWhatsAppModal = ref(false);
@@ -325,6 +328,25 @@ async function handleBatchAdd(numbers: number[]) {
     undoToast.value = {
       visible: true,
       message: `${count} láminas agregadas al álbum`,
+      action: null,
+    };
+    setTimeout(() => {
+      undoToast.value.visible = false;
+    }, 3000);
+  }
+}
+
+async function handleBatchRemove(numbers: number[]) {
+  showBatchRemove.value = false;
+  if (isPreview.value) {
+    showLoginPrompt.value = true;
+    return;
+  }
+  const count = await removeBatch(numbers);
+  if (count && count > 0) {
+    undoToast.value = {
+      visible: true,
+      message: `${count} láminas quitadas del álbum`,
       action: null,
     };
     setTimeout(() => {
@@ -755,6 +777,13 @@ const userInitial = computed(() => {
         <button class="tab-add" title="Agregar láminas por número" @click="showBatchInput = true">
           + Agregar
         </button>
+        <button
+          class="tab-add tab-remove"
+          title="Quitar láminas por número"
+          @click="showBatchRemove = true"
+        >
+          − Quitar
+        </button>
       </nav>
 
       <!-- Tab preview hints -->
@@ -854,6 +883,11 @@ const userInitial = computed(() => {
 
     <!-- BATCH INPUT MODAL -->
     <BatchInput v-if="showBatchInput" @add="handleBatchAdd" @close="showBatchInput = false" />
+    <BatchRemoveInput
+      v-if="showBatchRemove"
+      @remove="handleBatchRemove"
+      @close="showBatchRemove = false"
+    />
 
     <!-- STICKER SCANNER MODAL -->
     <StickerScanner v-if="showScanner" @add="handleScannerAdd" @close="showScanner = false" />
@@ -1555,6 +1589,14 @@ const userInitial = computed(() => {
 }
 .tab-add:hover {
   background: rgba(232, 179, 65, 0.15);
+}
+.tab-remove {
+  color: var(--coral);
+  background: rgba(226, 90, 58, 0.08);
+  border-color: rgba(226, 90, 58, 0.3);
+}
+.tab-remove:hover {
+  background: rgba(226, 90, 58, 0.15);
 }
 
 /* Tab preview hints */

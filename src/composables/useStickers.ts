@@ -696,6 +696,101 @@ function removeSticker(stickerNumber: number) {
   setSticker(stickerNumber, { owned: false, dupes: 0, note: '' });
 }
 
+/**
+ * Bulk inverso de addBatch: cada aparición de un sticker en el array resta 1
+ * copia. Si la lámina no estaba marcada, la aparición se ignora. Cuando se
+ * quitan todas las copias, queda owned=false con dupes=0.
+ */
+async function removeBatch(stickerNumbers: number[]) {
+  const { user } = useAuth();
+  if (!user.value || sectionInFlight) return 0;
+  sectionInFlight = true;
+
+  try {
+    if (!(await ensureFreshSession())) {
+      syncError.value = 'Sesión expirada. Recarga la página.';
+      return 0;
+    }
+
+    // Apariciones por sticker en el input
+    const counts = new Map<number, number>();
+    for (const num of stickerNumbers) {
+      if (num < 1 || num > TOTAL_STICKERS) continue;
+      counts.set(num, (counts.get(num) || 0) + 1);
+    }
+
+    const toUpsert: { num: number; prev: StickerState | undefined; newState: StickerState }[] = [];
+    const toDelete: { num: number; prev: StickerState }[] = [];
+
+    for (const [num, count] of counts) {
+      const existing = stickers.value[num];
+      if (!existing?.owned) continue; // no tenía nada → nada que quitar
+
+      const totalCopies = 1 + existing.dupes;
+      const removed = Math.min(count, totalCopies);
+      const remaining = totalCopies - removed;
+
+      if (remaining <= 0) {
+        // Se va a 0 copias → borrar la fila (igual que removeSticker)
+        toDelete.push({ num, prev: existing });
+      } else {
+        toUpsert.push({
+          num,
+          prev: existing,
+          newState: { ...existing, dupes: remaining - 1 },
+        });
+      }
+    }
+
+    if (toUpsert.length === 0 && toDelete.length === 0) return 0;
+
+    // Optimistic
+    const newMap = { ...stickers.value };
+    for (const { num, newState } of toUpsert) newMap[num] = newState;
+    for (const { num } of toDelete) delete newMap[num];
+    stickers.value = newMap;
+
+    // Upsert los que siguen owned, delete los que llegan a 0
+    if (toUpsert.length > 0) {
+      const rows = toUpsert.map(({ num, newState }) => ({
+        user_id: user.value!.id,
+        sticker_number: num,
+        owned: newState.owned,
+        dupes: newState.dupes,
+        note: newState.note || null,
+      }));
+      const { error } = await withAuthRetry(() =>
+        supabase.from('stickers').upsert(rows, { onConflict: 'user_id,sticker_number' }),
+      );
+      if (error) {
+        console.error('[useStickers] removeBatch upsert error, enqueuing:', error);
+        for (const { num, prev, newState } of toUpsert) {
+          enqueueOp(num, newState, prev, error.message);
+        }
+        syncError.value = null;
+      }
+    }
+
+    if (toDelete.length > 0) {
+      const nums = toDelete.map((r) => r.num);
+      const { error } = await withAuthRetry(() =>
+        supabase.from('stickers').delete().eq('user_id', user.value!.id).in('sticker_number', nums),
+      );
+      if (error) {
+        console.error('[useStickers] removeBatch delete error, enqueuing:', error);
+        for (const { num, prev } of toDelete) {
+          enqueueOp(num, { owned: false, dupes: 0, note: '' }, prev, error.message);
+        }
+        syncError.value = null;
+      }
+    }
+
+    return toUpsert.length + toDelete.length;
+  } finally {
+    sectionInFlight = false;
+  }
+}
+
 // Marcar toda una seccion como owned — 1 bulk upsert
 async function markSectionComplete(startsAt: number, count: number) {
   const { user } = useAuth();
@@ -1112,6 +1207,7 @@ export function useStickers() {
     markSectionComplete,
     clearSection,
     addBatch,
+    removeBatch,
     setNote,
     importBulk,
     decrementSticker,
