@@ -12,6 +12,7 @@ import {
   sectionForSticker,
   codeForSticker,
 } from '@/lib/albumData';
+import { track } from '@/lib/analytics';
 import { pctColor } from '@/lib/progressColors';
 import StickerDetailModal from '@/components/StickerDetailModal.vue';
 import ShareModal from '@/components/ShareModal.vue';
@@ -663,7 +664,14 @@ const userInitial = computed(() => {
         <button :class="['tab', { on: view === 'calc' }]" @click="setView('calc')">
           Calculadora
         </button>
-        <button class="tab-scan" title="Escanear sobre" @click="showScanner = true">
+        <button
+          class="tab-scan"
+          title="Escanear sobre"
+          @click="
+            showScanner = true;
+            track('open_scanner');
+          "
+        >
           <svg
             width="14"
             height="14"

@@ -6,6 +6,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useShare } from '@/composables/useShare';
 import { TOTAL_STICKERS, TOTAL_SECTIONS, ALBUM_SECTIONS, codeForSticker } from '@/lib/albumData';
 import { useMeta } from '@/composables/useMeta';
+import { track } from '@/lib/analytics';
 
 interface PublicProfile {
   id: string;
@@ -157,6 +158,10 @@ async function shareProfile() {
       title: `${ownerLabel} del Mundial — ${stats.value.pct}% completo`,
       text: `${ownerLabel} del Mundial: ${stats.value.owned} de ${TOTAL_STICKERS} láminas (${stats.value.pct}% completo).`,
       url,
+    });
+    track('share_profile', {
+      kind: isOwnProfile.value ? 'own' : 'other',
+      result,
     });
     if (result === 'copied') {
       copied.value = 'Link copiado';
