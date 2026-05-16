@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
+import { applyUpdateAndGoTo, updateAvailable } from '@/pwa/update';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -50,6 +51,13 @@ const router = createRouter({
       meta: { requiresOnboarded: true },
     },
   ],
+});
+
+router.beforeEach((to, from) => {
+  if (!updateAvailable.value || to.fullPath === from.fullPath) return;
+
+  void applyUpdateAndGoTo(to.fullPath);
+  return false;
 });
 
 router.beforeEach(async (to) => {

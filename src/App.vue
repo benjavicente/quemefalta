@@ -2,6 +2,8 @@
 import { onMounted } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 import { Analytics } from '@vercel/analytics/vue';
+import '@/pwa/update';
+import UpdateBanner from '@/pwa/UpdateBanner.vue';
 
 const { init } = useAuth();
 
@@ -16,5 +18,6 @@ onMounted(() => {
 
 <template>
   <RouterView />
+  <UpdateBanner />
   <Analytics v-if="analyticsEnabled" />
 </template>
