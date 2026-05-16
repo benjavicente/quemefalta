@@ -185,3 +185,22 @@ export function injectSession(page: Page, session = TEST_SESSION) {
     localStorage.setItem('quemefalta_onboarding_done', '1');
   }, session);
 }
+
+/**
+ * Anula el service worker antes de cada test para evitar que cachee
+ * navigations entre tests y rompa los route handlers mockeados.
+ * Llamar en beforeEach (o equivalente) junto con setupSupabaseRoutes.
+ */
+export function disableServiceWorker(page: Page) {
+  return page.addInitScript(() => {
+    (window as unknown as { __QMF_SKIP_SW__: boolean }).__QMF_SKIP_SW__ = true;
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister());
+      });
+      if ('caches' in window) {
+        caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+      }
+    }
+  });
+}

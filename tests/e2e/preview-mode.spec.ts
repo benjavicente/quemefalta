@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { setupSupabaseRoutes } from './fixtures/handlers';
+import { setupSupabaseRoutes, disableServiceWorker } from './fixtures/handlers';
 
 test.describe('Preview Mode (unauthenticated)', () => {
   test.beforeEach(async ({ page }) => {
+    await disableServiceWorker(page);
     await setupSupabaseRoutes(page, { authenticated: false });
   });
 

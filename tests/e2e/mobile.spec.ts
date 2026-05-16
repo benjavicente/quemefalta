@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupSupabaseRoutes, injectSession } from './fixtures/handlers';
+import { setupSupabaseRoutes, injectSession, disableServiceWorker } from './fixtures/handlers';
 import { TEST_PROFILE } from './fixtures/data';
 
 test.use({
@@ -9,6 +9,7 @@ test.use({
 
 test.describe('Mobile (375px)', () => {
   test.beforeEach(async ({ page }) => {
+    await disableServiceWorker(page);
     await setupSupabaseRoutes(page, {
       authenticated: true,
       profile: TEST_PROFILE,

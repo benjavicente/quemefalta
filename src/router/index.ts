@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
+import { updateAvailable, applyUpdateAndGoTo, isBusy } from '@/lib/pwaUpdate';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -50,6 +51,22 @@ const router = createRouter({
       meta: { requiresOnboarded: true },
     },
   ],
+});
+
+// PWA update guard: si hay versión nueva y el user navega a otra ruta sin
+// estar en medio de algo (modal abierto, input con texto), aplicamos el SW
+// nuevo y hacemos una nav full-page al destino. Cero fricción: aterriza en
+// la ruta que clickeó pero con el bundle nuevo.
+router.beforeEach(async (to, from) => {
+  if (
+    updateAvailable.value &&
+    to.fullPath !== from.fullPath &&
+    from.fullPath !== '/' &&
+    !isBusy()
+  ) {
+    await applyUpdateAndGoTo(to.fullPath);
+    return false;
+  }
 });
 
 router.beforeEach(async (to) => {

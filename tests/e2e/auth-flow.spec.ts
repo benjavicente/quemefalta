@@ -1,8 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { setupSupabaseRoutes, injectSession } from './fixtures/handlers';
+import { setupSupabaseRoutes, injectSession, disableServiceWorker } from './fixtures/handlers';
 import { TEST_PROFILE } from './fixtures/data';
 
 test.describe('Auth Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    await disableServiceWorker(page);
+  });
+
   test('unauthenticated user stays on /album in preview mode', async ({ page }) => {
     await setupSupabaseRoutes(page, { authenticated: false });
     await page.goto('/album');

@@ -41,7 +41,7 @@ npx playwright test --debug                           # Step-by-step debugger
 - **Vue 3 + Composition API** — `<script setup>` en todo
 - **Supabase** — Auth (Google OAuth) + PostgreSQL + RLS + RPCs con `SECURITY DEFINER`
 - **Mock mode** — `VITE_MOCK=true` reemplaza Supabase con mock local (`mock-data.json` via Vite plugin)
-- **PWA** — Manifest, iconos, meta tags dinámicos (`useMeta`), `viewport-fit=cover` + `env(safe-area-inset-*)` en vistas standalone
+- **PWA** — `vite-plugin-pwa` con `registerType: 'prompt'`. SW precachea assets buildeados (`globPatterns` JS/CSS/HTML/img/fonts), `navigateFallback: '/index.html'`, Supabase `NetworkOnly`. Update flow en `src/lib/pwaUpdate.ts`: `onNeedRefresh` → toast (`UpdateToast.vue`) o silent update vía router guard (`beforeEach` en `src/router/index.ts` hace `SKIP_WAITING` + nav full-page al destino si no hay modal/input ocupado). Manifest/iconos en `public/`. Headers no-cache en `vercel.json` para `/sw.js`, `/index.html`, manifests.
 - **OCR** — tesseract.js para escanear códigos de láminas desde cámara
 - **Vercel Web Analytics** — `<Analytics />` en `App.vue`, `track()` custom envuelto en `src/lib/analytics.ts` (no-op en mock mode)
 - **CI** — GitHub Actions: lint + build + vitest (con coverage) + playwright E2E

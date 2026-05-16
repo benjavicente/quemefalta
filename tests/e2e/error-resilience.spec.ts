@@ -1,8 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { setupSupabaseRoutes, injectSession } from './fixtures/handlers';
+import { setupSupabaseRoutes, injectSession, disableServiceWorker } from './fixtures/handlers';
 import { TEST_PROFILE } from './fixtures/data';
 
 test.describe('Error Resilience', () => {
+  test.beforeEach(async ({ page }) => {
+    await disableServiceWorker(page);
+  });
+
   test.describe('401 — expired session triggers retry + sessionDead', () => {
     test('single 401 on sticker save triggers refresh and retries successfully', async ({
       page,

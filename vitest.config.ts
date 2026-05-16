@@ -30,6 +30,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // En tests no corre vite-plugin-pwa, así que el módulo virtual
+      // no existe. Lo apuntamos a un stub para que vitest pueda mockearlo.
+      'virtual:pwa-register': fileURLToPath(
+        new URL('./src/__tests__/mocks/pwa-register.ts', import.meta.url),
+      ),
     },
   },
 });
