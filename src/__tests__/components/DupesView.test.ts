@@ -131,4 +131,57 @@ describe('DupesView', () => {
 
     expect(w.find('.list-head-text h2').text()).toContain('TIENES 5 REPETIDAS');
   });
+
+  it('toggle "Mostrar todas las que tengo" incluye owned sin dupes', async () => {
+    const { useStickers } = await import('@/composables/useStickers');
+    const s = useStickers() as any;
+    s._setStickers({
+      5: { owned: true, dupes: 0, note: '' },
+      10: { owned: true, dupes: 2, note: '' },
+      15: { owned: false, dupes: 0, note: '' },
+    });
+
+    const w = mount(DupesView);
+    await w.vm.$nextTick();
+
+    expect(w.findAll('.dupe-item').length).toBe(1);
+
+    await w.find('.show-all-toggle').trigger('click');
+    await w.vm.$nextTick();
+
+    const items = w.findAll('.dupe-item');
+    expect(items.length).toBe(2);
+    expect(items.some((i) => i.classes('dupe-item-empty'))).toBe(true);
+  });
+
+  it('toggle no muestra láminas no-owned', async () => {
+    const { useStickers } = await import('@/composables/useStickers');
+    const s = useStickers() as any;
+    s._setStickers({
+      5: { owned: true, dupes: 0, note: '' },
+      10: { owned: false, dupes: 0, note: '' },
+      15: { owned: false, dupes: 0, note: '' },
+    });
+
+    const w = mount(DupesView);
+    await w.vm.$nextTick();
+    await w.find('.show-all-toggle').trigger('click');
+    await w.vm.$nextTick();
+
+    expect(w.findAll('.dupe-item').length).toBe(1);
+  });
+
+  it('toggle aria-pressed refleja estado', async () => {
+    const { useStickers } = await import('@/composables/useStickers');
+    const s = useStickers() as any;
+    s._setStickers({ 5: { owned: true, dupes: 1, note: '' } });
+
+    const w = mount(DupesView);
+    await w.vm.$nextTick();
+
+    const toggle = w.find('.show-all-toggle');
+    expect(toggle.attributes('aria-pressed')).toBe('false');
+    await toggle.trigger('click');
+    expect(toggle.attributes('aria-pressed')).toBe('true');
+  });
 });

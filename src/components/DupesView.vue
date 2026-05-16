@@ -13,6 +13,7 @@ const emit = defineEmits<{
 const { stickers, stats, adjustDupes } = useStickers();
 
 const searchQuery = ref('');
+const showAllOwned = ref(false);
 
 // "Visible set" sticky por mount: arrancamos con los que tienen dupes>0 al
 // entrar a la vista, y agregamos cualquiera que adquiera dupes>0 durante la
@@ -45,8 +46,9 @@ const dupesList = computed(() => {
     if (!matchesSection(sec, searchQuery.value)) continue;
     for (let i = 0; i < sec.count; i++) {
       const num = sec.startsAt + i;
-      if (!visibleSet.value.has(num)) continue;
       const s = stickers.value[num];
+      const include = showAllOwned.value ? s?.owned === true : visibleSet.value.has(num);
+      if (!include) continue;
       out.push({
         num,
         section: sec.name,
@@ -58,6 +60,10 @@ const dupesList = computed(() => {
   }
   return out.sort((a, b) => a.num - b.num);
 });
+
+const hasShowable = computed(() =>
+  showAllOwned.value ? stats.value.owned > 0 : visibleSet.value.size > 0,
+);
 
 function copyDupes() {
   const lines: string[] = [`Tengo ${stats.value.dupes} láminas repetidas para cambiar:`];
@@ -104,10 +110,22 @@ function copyDupes() {
         Copiar
       </button>
     </div>
-    <SectionSearch v-if="stats.dupes > 0" v-model="searchQuery" class="dupes-search" />
+    <div v-if="stats.dupes > 0 || stats.owned > 0" class="dupes-controls">
+      <SectionSearch v-model="searchQuery" class="dupes-search" />
+      <button
+        v-if="stats.owned > 0"
+        type="button"
+        class="show-all-toggle"
+        :class="{ 'show-all-on': showAllOwned }"
+        :aria-pressed="showAllOwned"
+        @click="showAllOwned = !showAllOwned"
+      >
+        {{ showAllOwned ? '✓ Mostrando todas las que tengo' : 'Mostrar todas las que tengo' }}
+      </button>
+    </div>
 
-    <div v-if="stats.dupes > 0 && dupesList.length === 0" class="empty-search">
-      Sin repetidas en "{{ searchQuery }}".
+    <div v-if="hasShowable && dupesList.length === 0" class="empty-search">
+      Sin resultados en "{{ searchQuery }}".
     </div>
 
     <div v-else-if="dupesList.length === 0" class="empty empty-dupes">
@@ -230,8 +248,40 @@ function copyDupes() {
   background: var(--gold-deep);
 }
 
-.dupes-search {
+.dupes-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-bottom: 14px;
+}
+.dupes-search {
+  margin-bottom: 0;
+}
+.show-all-toggle {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid rgba(246, 241, 225, 0.18);
+  color: rgba(246, 241, 225, 0.65);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 7px 12px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.show-all-toggle:hover {
+  border-color: rgba(246, 241, 225, 0.32);
+  color: rgba(246, 241, 225, 0.85);
+}
+.show-all-toggle.show-all-on {
+  background: rgba(232, 179, 65, 0.14);
+  border-color: var(--gold);
+  color: var(--gold);
 }
 .empty-search {
   text-align: center;
