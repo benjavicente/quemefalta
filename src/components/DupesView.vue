@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { ALBUM_SECTIONS, codeForSticker } from '@/lib/albumData';
 import { useStickers } from '@/composables/useStickers';
 import SectionSearch from '@/components/SectionSearch.vue';
-import { matchesSection } from '@/lib/searchSections';
+import { matchesSection, matchesStickerCode } from '@/lib/searchSections';
 
 const emit = defineEmits<{
   openDetail: [stickerNumber: number];
@@ -49,6 +49,7 @@ const dupesList = computed(() => {
       const s = stickers.value[num];
       const include = showAllOwned.value ? s?.owned === true : visibleSet.value.has(num);
       if (!include) continue;
+      if (!matchesStickerCode(codeForSticker(num), searchQuery.value)) continue;
       out.push({
         num,
         section: sec.name,

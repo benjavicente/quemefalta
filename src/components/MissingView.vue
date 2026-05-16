@@ -5,7 +5,7 @@ import { pctColor } from '@/lib/progressColors';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import { useStickers } from '@/composables/useStickers';
 import SectionSearch from '@/components/SectionSearch.vue';
-import { matchesSection } from '@/lib/searchSections';
+import { matchesSection, matchesStickerCode } from '@/lib/searchSections';
 
 const emit = defineEmits<{
   jumpToSection: [sectionId: string];
@@ -46,7 +46,13 @@ const missingBySection = computed(() => {
   }
 
   if (searchQuery.value.trim()) {
-    sections = sections.filter((g) => matchesSection(g.section, searchQuery.value));
+    sections = sections
+      .filter((g) => matchesSection(g.section, searchQuery.value))
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((num) => matchesStickerCode(codeForSticker(num), searchQuery.value)),
+      }))
+      .filter((g) => g.items.length > 0);
   }
 
   if (sortBy.value === 'almost') {
