@@ -26,8 +26,9 @@ test.describe('Error Resilience', () => {
       await page.locator('.acc-team').first().click();
       await expect(page.locator('.stk').first()).toBeVisible();
 
-      const firstSticker = page.locator('.stk').first();
-      await firstSticker.click();
+      const firstWrap = page.locator('.stk-wrap').first();
+      const firstSticker = firstWrap.locator('.stk');
+      await firstWrap.locator('.stk-ctrl-plus').click();
 
       // After retry succeeds, sticker should stay owned
       await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 10000 });
@@ -63,7 +64,7 @@ test.describe('Error Resilience', () => {
       await page.locator('.acc-team').first().click();
       await expect(page.locator('.stk').first()).toBeVisible();
 
-      await page.locator('.stk').first().click();
+      await page.locator('.stk-wrap').first().locator('.stk-ctrl-plus').click();
 
       // Session dead popup should appear
       await expect(page.locator('.dead-modal')).toBeVisible({ timeout: 15000 });
@@ -91,8 +92,9 @@ test.describe('Error Resilience', () => {
       await page.locator('.acc-team').first().click();
       await expect(page.locator('.stk').first()).toBeVisible();
 
-      const firstSticker = page.locator('.stk').first();
-      await firstSticker.click();
+      const firstWrap = page.locator('.stk-wrap').first();
+      const firstSticker = firstWrap.locator('.stk');
+      await firstWrap.locator('.stk-ctrl-plus').click();
 
       // Sticker se mantiene marcado (no revierte)
       await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 5000 });
@@ -166,8 +168,9 @@ test.describe('Error Resilience', () => {
       await page.locator('.acc-team').first().click();
       await expect(page.locator('.stk').first()).toBeVisible();
 
-      const firstSticker = page.locator('.stk').first();
-      await firstSticker.click();
+      const firstWrap = page.locator('.stk-wrap').first();
+      const firstSticker = firstWrap.locator('.stk');
+      await firstWrap.locator('.stk-ctrl-plus').click();
 
       // Should appear owned immediately (optimistic), even though network takes 2s
       await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 500 });
@@ -196,8 +199,9 @@ test.describe('Error Resilience', () => {
       await page.unrouteAll();
       await context.setOffline(true);
 
-      const firstSticker = page.locator('.stk').first();
-      await firstSticker.click();
+      const firstWrap = page.locator('.stk-wrap').first();
+      const firstSticker = firstWrap.locator('.stk');
+      await firstWrap.locator('.stk-ctrl-plus').click();
 
       // Optimistic stays — el sticker no revierte.
       await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 5000 });
@@ -224,8 +228,9 @@ test.describe('Error Resilience', () => {
       await page.unrouteAll();
       await context.setOffline(true);
 
-      const firstSticker = page.locator('.stk').first();
-      await firstSticker.click();
+      const firstWrap = page.locator('.stk-wrap').first();
+      const firstSticker = firstWrap.locator('.stk');
+      await firstWrap.locator('.stk-ctrl-plus').click();
 
       // Sticker queda marcado con indicador de pendiente.
       await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 5000 });

@@ -36,8 +36,8 @@ const steps: Step[] = [
     },
   },
   {
-    selector: '[data-stk]:first-child .stk',
-    text: 'Toca una lámina para marcarla. Tócala de nuevo y suma repetida (+1, +2…).',
+    selector: '.stk-wrap:first-child .stk-controls',
+    text: 'Usa + para sumar copias y − para quitar. El − se desactiva cuando no tienes la lámina.',
     position: 'bottom',
     setup: () => {
       // Open first team if none open
@@ -48,8 +48,8 @@ const steps: Step[] = [
     },
   },
   {
-    selector: '.sect-grid',
-    text: 'Arrastra el dedo sobre varias láminas para marcarlas de corrido',
+    selector: '.stk-wrap:first-child .stk',
+    text: 'Toca la lámina misma para ver el detalle: editar cantidad, agregar nota o quitarla.',
     position: 'bottom',
   },
   {
