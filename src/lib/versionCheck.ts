@@ -102,7 +102,10 @@ export function setupVersionCheck(): void {
   if (typeof document === 'undefined') return;
   started = true;
   document.addEventListener('visibilitychange', onVisibilityChange);
-  if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('debug') === '1') {
+  if (
+    typeof location !== 'undefined' &&
+    new URLSearchParams(location.search).get('debug') === '1'
+  ) {
     debugMode.value = true;
     setInterval(() => {
       triggerCheckNow();
