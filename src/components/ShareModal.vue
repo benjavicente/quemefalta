@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useShare } from '@/composables/useShare';
+import QRCode from 'qrcode';
+import QrModal from '@/components/QrModal.vue';
+import { track } from '@/lib/analytics';
 import type { Profile } from '@/types/app';
 
 const props = defineProps<{
@@ -27,6 +30,8 @@ const router = useRouter();
 const justCopied = ref(false);
 const showCompare = ref(false);
 const compareUser = ref('');
+const showQrModal = ref(false);
+const qrPreviewRef = ref<HTMLElement | null>(null);
 
 const url = computed(() => {
   return `${globalThis.location.origin}/u/${props.profile.username}`;
@@ -39,6 +44,28 @@ const shareText = computed(() => {
 const shareTitle = computed(() => {
   return `Mi álbum del Mundial — ${props.pct}% completo`;
 });
+
+async function renderQrPreview() {
+  try {
+    const svg = await QRCode.toString(url.value, {
+      type: 'svg',
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      color: { dark: '#0a3d2e', light: '#ffffff' },
+    });
+    if (qrPreviewRef.value) qrPreviewRef.value.innerHTML = svg;
+  } catch {
+    if (qrPreviewRef.value) qrPreviewRef.value.innerHTML = '';
+  }
+}
+
+function openQr() {
+  track('show_qr', { from: 'share_modal' });
+  showQrModal.value = true;
+}
+
+onMounted(renderQrPreview);
+watch(url, renderQrPreview);
 
 async function handleCopy() {
   const ok = await copyOnly(url.value);
@@ -151,6 +178,16 @@ function goCompare() {
         </a>
       </div>
 
+      <!-- QR preview + abrir grande -->
+      <button class="qr-preview-row" type="button" @click="openQr">
+        <div ref="qrPreviewRef" class="qr-preview-mini" />
+        <div class="qr-preview-text">
+          <div class="qr-preview-title">Código QR</div>
+          <div class="qr-preview-sub">Tócalo para mostrarlo grande</div>
+        </div>
+        <span class="qr-preview-arrow" aria-hidden="true">›</span>
+      </button>
+
       <button class="preview-btn" @click="viewPublic">👁 Ver cómo se ve mi perfil público</button>
 
       <!-- Compare with someone -->
@@ -170,6 +207,12 @@ function goCompare() {
 
       <button class="close-btn" @click="$emit('close')">CERRAR</button>
     </div>
+    <QrModal
+      v-if="showQrModal"
+      :url="url"
+      :username="profile.username"
+      @close="showQrModal = false"
+    />
   </div>
 </template>
 
@@ -322,6 +365,66 @@ function goCompare() {
   font-size: 11px;
   font-weight: 700;
   color: var(--pitch);
+}
+
+.qr-preview-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  background: rgba(10, 61, 46, 0.04);
+  border: 1px solid var(--paper-deep);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.qr-preview-row:hover {
+  background: rgba(10, 61, 46, 0.08);
+  border-color: var(--pitch);
+}
+.qr-preview-mini {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--paper-deep);
+}
+.qr-preview-mini :deep(svg) {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.qr-preview-text {
+  flex: 1;
+  min-width: 0;
+}
+.qr-preview-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pitch);
+  line-height: 1.2;
+}
+.qr-preview-sub {
+  font-size: 11px;
+  color: rgba(10, 61, 46, 0.55);
+  margin-top: 2px;
+}
+.qr-preview-arrow {
+  font-size: 22px;
+  color: rgba(10, 61, 46, 0.4);
+  flex-shrink: 0;
+  font-weight: 300;
 }
 
 .preview-btn {

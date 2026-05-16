@@ -66,7 +66,8 @@ AlbumView.vue ─── Vista principal, orquesta todo
 ├── BatchRemoveInput.vue ← Egreso rápido (espejo de BatchInput) — coral
 ├── SectionSearch.vue ← Input compartido con ícono lupa + clear ×
 ├── StickerScanner.vue ← OCR con cámara (tesseract.js + fuzzy matching)
-├── ShareModal.vue ← Compartir perfil propio (Web Share + redes)
+├── ShareModal.vue ← Compartir perfil propio (Web Share + redes + QR)
+├── QrModal.vue ← QR full-screen del perfil público (mostrar en persona)
 ├── WhatsAppModal.vue ← Editar profile.phone (visible solo a authenticated)
 ├── CsvModal.vue ← Export/import CSV grilla 49×20
 ├── OnboardingGuide.vue ← Tutorial de 11 pasos con spotlight

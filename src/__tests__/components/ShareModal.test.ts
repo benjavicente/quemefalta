@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import ShareModal from '@/components/ShareModal.vue';
+import QRCode from 'qrcode';
 import { createProfile } from '../mocks/factories';
+
+vi.mock('qrcode', () => {
+  const toString = vi.fn();
+  return {
+    default: { toString },
+    toString,
+  };
+});
 
 const mockShare = vi.fn().mockResolvedValue('shared');
 const mockCopyOnly = vi.fn().mockResolvedValue(true);
@@ -39,6 +48,7 @@ beforeEach(() => {
   mockShare.mockClear();
   mockCopyOnly.mockClear();
   mockOpenExternal.mockClear();
+  vi.mocked(QRCode.toString).mockResolvedValue('<svg data-testid="qr"/>' as never);
 });
 
 describe('ShareModal', () => {
@@ -142,6 +152,27 @@ describe('ShareModal', () => {
       expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('/u/testuser'), '_blank');
 
       openSpy.mockRestore();
+    });
+  });
+
+  describe('QR', () => {
+    it('renderiza el mini preview QR al montar', async () => {
+      const w = mountModal();
+      await flushPromises();
+      expect(w.find('.qr-preview-row').exists()).toBe(true);
+      expect(w.find('.qr-preview-mini').html()).toContain('<svg');
+      expect(QRCode.toString).toHaveBeenCalledWith(
+        expect.stringContaining('/u/testuser'),
+        expect.objectContaining({ type: 'svg' }),
+      );
+    });
+
+    it('click en el row abre el QrModal grande', async () => {
+      const w = mountModal();
+      await flushPromises();
+      expect(w.findComponent({ name: 'QrModal' }).exists()).toBe(false);
+      await w.find('.qr-preview-row').trigger('click');
+      expect(w.findComponent({ name: 'QrModal' }).exists()).toBe(true);
     });
   });
 });
