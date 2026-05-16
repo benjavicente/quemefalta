@@ -19,19 +19,20 @@ test.describe('Album Flow', () => {
     await expect(page.locator('.acc-team-count').first()).toContainText('0/20');
   });
 
-  test('tap sticker marks it as owned', async ({ page }) => {
+  test('botón + marca el sticker como owned', async ({ page }) => {
     await page.goto('/album');
 
     await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
-    const firstSticker = page.locator('.stk').first();
-    await firstSticker.click();
+    const firstWrap = page.locator('.stk-wrap').first();
+    const firstSticker = firstWrap.locator('.stk');
+    await firstWrap.locator('.stk-ctrl-plus').click();
 
     await expect(firstSticker).toHaveClass(/stk-owned/, { timeout: 3000 });
   });
 
-  test('long press opens detail modal', async ({ page }) => {
+  test('tap en el sticker abre el detalle', async ({ page }) => {
     await setupSupabaseRoutes(page, {
       authenticated: true,
       profile: TEST_PROFILE,
@@ -44,12 +45,7 @@ test.describe('Album Flow', () => {
     const firstSticker = page.locator('.stk').first();
     await expect(firstSticker).toHaveClass(/stk-owned/);
 
-    const box = await firstSticker.boundingBox();
-    if (!box) throw new Error('Sticker not visible');
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(500);
-    await page.mouse.up();
+    await firstSticker.click();
 
     await expect(page.locator('.pop')).toBeVisible({ timeout: 3000 });
   });

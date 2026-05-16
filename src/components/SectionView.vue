@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, inject, onUnmounted } from 'vue';
+import { computed, ref, inject } from 'vue';
 import type { Ref } from 'vue';
 import StickerCard from '@/components/StickerCard.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { useStickers } from '@/composables/useStickers';
-import { useUndo } from '@/composables/useUndo';
-import type { StickerState } from '@/composables/useStickers';
 import type { AlbumSection } from '@/lib/albumData';
 import { teamFlagEmoji } from '@/lib/teamFlagEmoji';
 import { FWC_CODE, getFwcVariant } from '@/lib/fwcConfig';
@@ -29,9 +27,7 @@ const {
   decrementSticker,
   markSectionComplete,
   clearSection,
-  setSticker,
 } = useStickers();
-const { pushUndo } = useUndo();
 
 const showClearConfirm = ref(false);
 
@@ -89,101 +85,6 @@ function confirmClear() {
   showClearConfirm.value = false;
   clearSection(props.section.startsAt, props.section.count);
 }
-
-// ── Paint mode (swipe-to-mark) ──
-const isPainting = ref(false);
-const paintedNums = new Set<number>();
-const paintPrevStates = new Map<number, StickerState>();
-const paintOrder = ref(new Map<number, number>()); // num -> order index for stagger
-let paintStart: number | null = null;
-let docMoveHandler: ((e: PointerEvent) => void) | null = null;
-let docUpHandler: (() => void) | null = null;
-
-function stkFromPoint(x: number, y: number): number | null {
-  const el = document.elementFromPoint(x, y);
-  const wrapper = el?.closest('[data-stk]') as HTMLElement | null;
-  if (!wrapper) return null;
-  const n = parseInt(wrapper.dataset.stk!);
-  return isNaN(n) ? null : n;
-}
-
-function paintMark(n: number) {
-  if (!paintedNums.has(n) && !getSticker(n).owned) {
-    paintPrevStates.set(n, { ...getSticker(n) });
-    const order = new Map(paintOrder.value);
-    order.set(n, paintedNums.size);
-    paintOrder.value = order;
-    paintedNums.add(n);
-    cycleSticker(n, true); // skip individual undo
-  }
-}
-
-function onPaintStart(num: number, e: PointerEvent) {
-  if (e.button !== 0 || isPreview.value) return;
-
-  paintStart = num;
-  isPainting.value = false;
-  paintedNums.clear();
-  paintPrevStates.clear();
-
-  docMoveHandler = (ev: PointerEvent) => {
-    const n = stkFromPoint(ev.clientX, ev.clientY);
-    if (n === null) return;
-
-    // Moved to a different card -> enter paint mode
-    if (!isPainting.value && n !== paintStart) {
-      isPainting.value = true;
-      // Mark the starting card
-      if (paintStart !== null) {
-        paintMark(paintStart);
-      }
-    }
-
-    // Mark every new card the pointer touches
-    if (isPainting.value) {
-      paintMark(n);
-    }
-  };
-
-  docUpHandler = () => cleanupPaint();
-
-  document.addEventListener('pointermove', docMoveHandler);
-  document.addEventListener('pointerup', docUpHandler);
-  document.addEventListener('pointercancel', docUpHandler);
-}
-
-function cleanupPaint() {
-  if (docMoveHandler) {
-    document.removeEventListener('pointermove', docMoveHandler);
-    docMoveHandler = null;
-  }
-  if (docUpHandler) {
-    document.removeEventListener('pointerup', docUpHandler);
-    document.removeEventListener('pointercancel', docUpHandler);
-    docUpHandler = null;
-  }
-
-  // Push batch undo if we painted multiple stickers
-  if (paintPrevStates.size > 1) {
-    const snapshot = new Map(paintPrevStates);
-    pushUndo(`${snapshot.size} laminas marcadas`, () => {
-      for (const [num, prev] of snapshot) {
-        setSticker(num, prev, true);
-      }
-    });
-  }
-
-  paintStart = null;
-  isPainting.value = false;
-  paintedNums.clear();
-  paintPrevStates.clear();
-  // Clear paint order after animations complete
-  setTimeout(() => {
-    paintOrder.value = new Map();
-  }, 500);
-}
-
-onUnmounted(() => cleanupPaint());
 </script>
 
 <template>
@@ -207,7 +108,6 @@ onUnmounted(() => cleanupPaint());
       <div
         v-for="item in items"
         :key="item.number"
-        :data-stk="item.number"
         :class="{
           'sect-grid-squad': item.variant === 'squad',
           'sect-grid-wide': item.variant === 'fwc-h',
@@ -216,14 +116,12 @@ onUnmounted(() => cleanupPaint());
             item.variant === 'fwc-v' &&
             items[items.indexOf(item) - 1]?.variant === 'fwc-h',
         }"
-        @pointerdown="onPaintStart(item.number, $event)"
       >
         <StickerCard
           :number="item.number"
           :code="item.code"
           :state="item.state"
           :variant="item.variant"
-          :anim-delay="(paintOrder.get(item.number) ?? 0) * 40"
           :sync-status="getStickerSyncStatus(item.number)"
           @cycle="isPreview ? emit('openDetail', item.number) : cycleSticker(item.number)"
           @decrement="isPreview ? emit('openDetail', item.number) : decrementSticker(item.number)"

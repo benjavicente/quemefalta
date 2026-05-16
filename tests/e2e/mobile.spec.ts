@@ -17,24 +17,23 @@ test.describe('Mobile (375px)', () => {
     await injectSession(page);
   });
 
-  test('touch tap marks sticker as owned and updates count', async ({ page }) => {
+  test('touch en + marca el sticker y actualiza el conteo', async ({ page }) => {
     await page.goto('/album');
 
     await page.locator('.acc-team').first().click();
     await expect(page.locator('.stk').first()).toBeVisible();
 
-    // Tap 3 stickers — locator.tap() dispatches a real touch event AND auto-scrolls
-    // the target into view, which page.touchscreen.tap() does not.
+    // Tap on the + button of 3 stickers
     for (let i = 0; i < 3; i++) {
-      const sticker = page.locator('.stk').nth(i);
-      await sticker.tap();
-      await expect(sticker).toHaveClass(/stk-owned/, { timeout: 3000 });
+      const wrap = page.locator('.stk-wrap').nth(i);
+      await wrap.locator('.stk-ctrl-plus').tap();
+      await expect(wrap.locator('.stk')).toHaveClass(/stk-owned/, { timeout: 3000 });
     }
 
     await expect(page.locator('.acc-team-count').first()).toContainText('3/20');
   });
 
-  test('long press opens bottom-sheet detail modal', async ({ page }) => {
+  test('tap en sticker abre bottom-sheet de detalle', async ({ page }) => {
     await setupSupabaseRoutes(page, {
       authenticated: true,
       profile: TEST_PROFILE,
@@ -46,13 +45,8 @@ test.describe('Mobile (375px)', () => {
     await page.locator('.acc-team').first().click();
     const firstSticker = page.locator('.stk').first();
     await expect(firstSticker).toHaveClass(/stk-owned/);
-    const box = await firstSticker.boundingBox();
-    if (!box) throw new Error('Sticker not visible');
 
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(500);
-    await page.mouse.up();
+    await firstSticker.tap();
 
     const modal = page.locator('.pop');
     await expect(modal).toBeVisible({ timeout: 3000 });

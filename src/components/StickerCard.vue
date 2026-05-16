@@ -11,7 +11,6 @@ const props = defineProps<{
   code: string;
   state: StickerState;
   variant?: 'normal' | 'crest' | 'squad' | 'fwc-h' | 'fwc-v';
-  animDelay?: number;
   /** Estado de sync: 'pending' (reintentando), 'failed' (no se guardo), o null si OK. */
   syncStatus?: 'pending' | 'failed' | null;
 }>();
@@ -56,13 +55,10 @@ watch(
   (newState) => {
     // Owned transition: not-owned -> owned
     if (newState.owned && !prevOwned) {
-      const delay = props.animDelay ?? 0;
+      justMarked.value = true;
       setTimeout(() => {
-        justMarked.value = true;
-        setTimeout(() => {
-          justMarked.value = false;
-        }, 350);
-      }, delay);
+        justMarked.value = false;
+      }, 350);
     }
     // Badge bounce: dupes changed
     if (newState.owned && newState.dupes !== prevDupes && prevOwned) {
@@ -77,45 +73,12 @@ watch(
   { deep: true },
 );
 const hasNote = computed(() => !!props.state.note);
-
-// Long press detection + isPressed guard for paint-mode compatibility
-let pressTimer: ReturnType<typeof setTimeout> | null = null;
-const didLongPress = ref(false);
-const isPressed = ref(false);
-
-function onPointerDown() {
-  isPressed.value = true;
-  didLongPress.value = false;
-  pressTimer = setTimeout(() => {
-    didLongPress.value = true;
-    emit('openDetail');
-  }, 400);
-}
-
-function onPointerUp() {
-  if (pressTimer) {
-    clearTimeout(pressTimer);
-    pressTimer = null;
-  }
-  // Only cycle if this card initiated the press (prevents ghost cycles during swipe paint)
-  if (isPressed.value && !didLongPress.value) {
-    emit('cycle');
-  }
-  isPressed.value = false;
-}
-
-function onPointerCancel() {
-  if (pressTimer) {
-    clearTimeout(pressTimer);
-    pressTimer = null;
-  }
-  isPressed.value = false;
-}
 </script>
 
 <template>
   <div class="stk-wrap">
-    <div
+    <button
+      type="button"
       class="stk"
       :class="{
         'stk-owned': owned,
@@ -126,10 +89,8 @@ function onPointerCancel() {
         'stk-fwc-h': isFwcH,
         'stk-fwc-v': isFwcV,
       }"
-      @pointerdown.prevent="onPointerDown"
-      @pointerup="onPointerUp"
-      @pointercancel="onPointerCancel"
-      @pointerleave="onPointerCancel"
+      :aria-label="`Ver detalle de ${code}`"
+      @click="emit('openDetail')"
       @contextmenu.prevent
     >
       <!-- Variant label -->
@@ -183,17 +144,26 @@ function onPointerCancel() {
         :title="syncStatus === 'failed' ? 'No se pudo guardar' : 'Guardando...'"
         :aria-label="syncStatus === 'failed' ? 'No se pudo guardar' : 'Guardando'"
       />
-    </div>
-    <button
-      v-if="owned"
-      class="stk-minus"
-      aria-label="Quitar una copia"
-      @pointerdown.stop.prevent
-      @pointerup.stop="emit('decrement')"
-      @click.stop.prevent
-    >
-      −
     </button>
+    <div class="stk-controls" role="group" :aria-label="`Ajustar copias de ${code}`">
+      <button
+        type="button"
+        class="stk-ctrl stk-ctrl-minus"
+        :disabled="!owned"
+        :aria-label="`Quitar una copia de ${code}`"
+        @click.stop="emit('decrement')"
+      >
+        −
+      </button>
+      <button
+        type="button"
+        class="stk-ctrl stk-ctrl-plus"
+        :aria-label="owned ? `Agregar una repetida de ${code}` : `Marcar ${code} como pegada`"
+        @click.stop="emit('cycle')"
+      >
+        +
+      </button>
+    </div>
   </div>
 </template>
 
@@ -216,9 +186,12 @@ function onPointerCancel() {
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
-}
-.stk:active {
-  transform: scale(0.95);
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  display: block;
 }
 .stk-owned {
   border: 1px solid var(--gold-deep);
@@ -465,31 +438,58 @@ function onPointerCancel() {
   color: var(--pitch-deep);
 }
 
-/* Minus button below card */
-.stk-minus {
-  width: 100%;
-  height: 22px;
-  border: none;
+/* +/- controls below card */
+.stk-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.stk-ctrl {
+  height: 32px;
+  border: 1px solid rgba(246, 241, 225, 0.14);
   border-radius: 6px;
-  background: rgba(246, 241, 225, 0.08);
-  color: rgba(246, 241, 225, 0.45);
+  background: rgba(246, 241, 225, 0.05);
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    transform 0.08s,
+    border-color 0.12s;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
-.stk-minus:hover {
-  background: rgba(239, 83, 80, 0.15);
+.stk-ctrl-minus {
   color: var(--coral);
+  border-color: rgba(226, 90, 58, 0.32);
 }
-.stk-minus:active {
+.stk-ctrl-minus:hover:not(:disabled) {
+  background: rgba(226, 90, 58, 0.15);
+  border-color: var(--coral);
+}
+.stk-ctrl-plus {
+  color: var(--mint);
+  border-color: rgba(95, 194, 138, 0.32);
+}
+.stk-ctrl-plus:hover {
+  background: rgba(95, 194, 138, 0.15);
+  border-color: var(--mint);
+}
+.stk-ctrl:active:not(:disabled) {
   transform: scale(0.95);
+}
+.stk-ctrl:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  color: rgba(246, 241, 225, 0.4);
+  border-color: rgba(246, 241, 225, 0.1);
+  background: transparent;
 }
 
 /* Micro-animations */

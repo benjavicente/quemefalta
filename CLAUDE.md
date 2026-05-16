@@ -54,7 +54,7 @@ AlbumView.vue ─── Vista principal, orquesta todo
 ├── AlbumAccordion.vue ← Grupos A-L → equipos → stickers inline
 │                       (pill de páginas completas X/4 por grupo)
 │   └── SectionView.vue ← Grilla de 20 stickers por equipo
-│       └── StickerCard.vue ← Card individual (tap=marcar, long=detalle)
+│       └── StickerCard.vue ← Card individual (tap=detalle, +/− abajo para marcar)
 │           ├── variant: crest (lámina 1, escudo con ball-crest.jpg)
 │           ├── variant: squad (lámina 13, horizontal con field-squad.jpg)
 │           └── variant: normal (resto, ball-stadium.png)

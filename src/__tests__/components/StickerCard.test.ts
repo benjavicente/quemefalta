@@ -62,62 +62,42 @@ describe('StickerCard', () => {
   });
 
   describe('interactions', () => {
-    it('emits cycle on short click (pointerdown + quick pointerup)', async () => {
+    it('tap en la card emite openDetail (no cycle)', async () => {
+      const w = mountCard({ owned: true });
+      await w.find('.stk').trigger('click');
+      expect(w.emitted('openDetail')).toHaveLength(1);
+      expect(w.emitted('cycle')).toBeUndefined();
+    });
+
+    it('botón + emite cycle (no openDetail)', async () => {
       const w = mountCard();
-      const stk = w.find('.stk');
-
-      await stk.trigger('pointerdown');
-      await stk.trigger('pointerup');
-
+      await w.find('.stk-ctrl-plus').trigger('click');
       expect(w.emitted('cycle')).toHaveLength(1);
       expect(w.emitted('openDetail')).toBeUndefined();
     });
 
-    it('emits openDetail on long press (400ms)', async () => {
-      vi.useFakeTimers();
-      const w = mountCard();
-      const stk = w.find('.stk');
-
-      await stk.trigger('pointerdown');
-      vi.advanceTimersByTime(400);
-      await stk.trigger('pointerup');
-
-      expect(w.emitted('openDetail')).toHaveLength(1);
-      expect(w.emitted('cycle')).toBeUndefined();
-
-      vi.useRealTimers();
+    it('botón − emite decrement cuando owned', async () => {
+      const w = mountCard({ owned: true, dupes: 1 });
+      await w.find('.stk-ctrl-minus').trigger('click');
+      expect(w.emitted('decrement')).toHaveLength(1);
     });
 
-    it('cancels long press on pointercancel', async () => {
-      vi.useFakeTimers();
-      const w = mountCard();
-      const stk = w.find('.stk');
-
-      await stk.trigger('pointerdown');
-      vi.advanceTimersByTime(200);
-      await stk.trigger('pointercancel');
-      vi.advanceTimersByTime(300);
-      await stk.trigger('pointerup');
-
-      // Neither event should fire since pointer was cancelled
-      expect(w.emitted('openDetail')).toBeUndefined();
-
-      vi.useRealTimers();
+    it('botón − está disabled cuando no owned', () => {
+      const w = mountCard({ owned: false });
+      const minus = w.find('.stk-ctrl-minus');
+      expect(minus.attributes('disabled')).toBeDefined();
     });
 
-    it('cancels long press on pointerleave', async () => {
-      vi.useFakeTimers();
-      const w = mountCard();
-      const stk = w.find('.stk');
+    it('botón − habilitado cuando owned aunque dupes=0', () => {
+      const w = mountCard({ owned: true, dupes: 0 });
+      const minus = w.find('.stk-ctrl-minus');
+      expect(minus.attributes('disabled')).toBeUndefined();
+    });
 
-      await stk.trigger('pointerdown');
-      vi.advanceTimersByTime(200);
-      await stk.trigger('pointerleave');
-      vi.advanceTimersByTime(300);
-
-      expect(w.emitted('openDetail')).toBeUndefined();
-
-      vi.useRealTimers();
+    it('botón + siempre habilitado (incluso cuando no owned)', () => {
+      const w = mountCard({ owned: false });
+      const plus = w.find('.stk-ctrl-plus');
+      expect(plus.attributes('disabled')).toBeUndefined();
     });
   });
 });
